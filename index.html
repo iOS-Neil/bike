@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>World Cup 2026 Predictor Pro</title>
     
-    <!-- Scripts for React, Tailwind, and Firebase (Compat version) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -19,7 +18,6 @@
         body { font-family: 'Inter', sans-serif; }
         .animate-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        /* Custom scrollbar for a premium look */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #020617; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
@@ -48,7 +46,8 @@
     const appId = "my-world-cup-predictor-2026";
 
     // PASTE YOUR UID HERE after you register to lock the admin panel to just you
-    const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
+    // Example: const ADMIN_UID = "AbC123XyZ...";
+    const ADMIN_UID = "mJFQl94QpgMzbfi07u2EStaxDJZ2"; 
 
     const COUNTRY_FLAGS = {
         "Mexico": "🇲🇽", "South Africa": "🇿🇦", "South Korea": "🇰🇷", "Czech Republic": "🇨🇿",
@@ -97,6 +96,7 @@
                 setUser(u);
                 setAuthLoading(false);
                 if (u) {
+                    setAuthView('none');
                     const userRef = db.ref(`artifacts/${appId}/public/data/users/${u.uid}`);
                     userRef.update({
                         uid: u.uid,
@@ -107,24 +107,21 @@
                 }
             });
 
-            // Listen for matches
             db.ref(`artifacts/${appId}/public/data/matches`).on('value', snap => {
                 const data = snap.val() || {};
                 setMatches(Object.keys(data).map(k => ({ ...data[k], id: k })));
             });
 
-            // Listen for predictions
             db.ref(`artifacts/${appId}/public/data/predictions`).on('value', snap => {
                 const data = snap.val() || {};
                 setPredictions(Object.keys(data).map(k => ({ ...data[k], id: k })));
             });
 
-            // Listen for users
             db.ref(`artifacts/${appId}/public/data/users`).on('value', snap => {
                 const data = snap.val() || {};
                 setUsers(Object.values(data));
             });
-        }, [email]);
+        }, []);
 
         const handleAuth = async (e) => {
             e.preventDefault();
@@ -146,8 +143,8 @@
             if (!user) return;
             const predId = `${user.uid}_${matchId}`;
             const existing = predictions.find(p => p.id === predId) || { homePredict: 0, awayPredict: 0 };
-            let h = existing.homePredict;
-            let a = existing.awayPredict;
+            let h = parseInt(existing.homePredict) || 0;
+            let a = parseInt(existing.awayPredict) || 0;
             if (team === 'home') h = Math.max(0, h + change);
             else a = Math.max(0, a + change);
 
@@ -164,11 +161,16 @@
                     predictions.filter(p => p.userId === u.uid).forEach(p => {
                         const m = matches.find(match => match.id === p.matchId);
                         if (m && m.completed) {
-                            if (m.homeScore === p.homePredict && m.awayScore === p.awayPredict) {
+                            const actH = parseInt(m.homeScore);
+                            const actA = parseInt(m.awayScore);
+                            const prH = parseInt(p.homePredict);
+                            const prA = parseInt(p.awayPredict);
+
+                            if (actH === prH && actA === prA) {
                                 pts += 5; exact++;
                             } else {
-                                const mRes = m.homeScore > m.awayScore ? 'H' : m.homeScore < m.awayScore ? 'A' : 'D';
-                                const pRes = p.homePredict > p.awayPredict ? 'H' : p.homePredict < p.awayPredict ? 'A' : 'D';
+                                const mRes = actH > actA ? 'H' : actH < actA ? 'A' : 'D';
+                                const pRes = prH > prA ? 'H' : prH < prA ? 'A' : 'D';
                                 if (mRes === pRes) pts += 2;
                             }
                         }
@@ -193,6 +195,9 @@
                     <div className="text-center md:text-left">
                         <h1 className="text-2xl font-black bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent uppercase tracking-tight">World Cup 2026</h1>
                         <p className="text-[10px] font-bold text-slate-500 tracking-[0.3em] uppercase">Predictor Pro</p>
+                        {user && (
+                            <p className="text-[9px] text-slate-600 mt-2 font-mono">YOUR UID: {user.uid}</p>
+                        )}
                     </div>
                     
                     <div className="flex items-center gap-4">
@@ -228,26 +233,31 @@
                                 db.ref(`artifacts/${appId}/public/data/matches/${m.id}`).update({ homeScore: h, awayScore: a, completed: true });
                             });
                         }} className="bg-amber-500 text-slate-950 px-4 py-2 rounded-xl text-[10px] font-black uppercase">⚡ Simulate All Scores</button>
-                        <button onClick={() => {
-                             if(confirm("Reset Tournament?")) db.ref(`artifacts/${appId}/public/data`).remove();
-                        }} className="bg-red-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Reset Database</button>
                     </div>
                 )}
 
                 {/* MAIN CONTENT */}
-                {!user ? (
+                {authView !== 'none' ? (
                     <div className="bg-slate-900/50 border border-slate-800 p-16 rounded-[3rem] text-center space-y-6">
-                        <span className="text-6xl block">🔒</span>
-                        <h2 className="text-2xl font-black uppercase tracking-tight">Predictions Locked</h2>
-                        <p className="text-slate-500 text-sm max-w-sm mx-auto leading-relaxed">Join the tournament to predict scores, earn points, and climb the leaderboard. Register your account to start!</p>
-                        <div className="flex justify-center gap-4">
-                             <button onClick={() => setAuthView('register')} className="bg-emerald-500 text-slate-950 px-8 py-3 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-emerald-400 transition-colors">Create Account</button>
-                             <button onClick={() => setAuthView('login')} className="bg-slate-800 text-slate-300 px-8 py-3 rounded-2xl font-black text-xs uppercase border border-slate-700">Sign In</button>
-                        </div>
+                        <span className="text-6xl block">🏆</span>
+                        <h2 className="text-2xl font-black uppercase tracking-tight">{authView === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
+                        {authError && <div className="text-red-400 text-xs font-bold">{authError}</div>}
+                        <form onSubmit={handleAuth} className="max-w-xs mx-auto space-y-3">
+                             {authView === 'register' && (
+                                <input type="text" placeholder="Your Display Name" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-emerald-500 outline-none" required />
+                             )}
+                             <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-emerald-500 outline-none" required />
+                             <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-emerald-500 outline-none" required />
+                             <button type="submit" className="w-full bg-emerald-500 text-slate-950 px-8 py-3 rounded-2xl font-black text-xs uppercase shadow-xl hover:bg-emerald-400 transition-colors">
+                                 {authView === 'login' ? 'Sign In' : 'Register'}
+                             </button>
+                             <button type="button" onClick={() => setAuthView(authView === 'login' ? 'register' : 'login')} className="text-[10px] text-slate-500 uppercase font-black hover:text-white">
+                                 {authView === 'login' ? 'Need an account? Register' : 'Already have an account? Login'}
+                             </button>
+                        </form>
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        {/* TABS */}
                         <div className="bg-slate-900 p-1.5 rounded-2xl flex border border-slate-800 shadow-xl">
                             <button onClick={() => setActiveTab('predictions')} className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${activeTab === 'predictions' ? 'bg-emerald-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>PREDICTIONS</button>
                             <button onClick={() => setActiveTab('leaderboard')} className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${activeTab === 'leaderboard' ? 'bg-emerald-500 text-slate-950' : 'text-slate-500 hover:text-slate-300'}`}>LEADERBOARD</button>
@@ -322,32 +332,6 @@
                                 </table>
                             </div>
                         )}
-                    </div>
-                )}
-
-                {/* AUTH OVERLAY */}
-                {authView !== 'none' && (
-                    <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-6 z-50">
-                        <div className="bg-slate-900 border border-slate-800 w-full max-w-md p-10 rounded-[3rem] shadow-2xl space-y-8 animate-in relative">
-                             <button onClick={() => setAuthView('none')} className="absolute top-6 right-8 text-slate-500 hover:text-white font-black text-xl">×</button>
-                             <div className="text-center space-y-2">
-                                <span className="text-4xl block">🏆</span>
-                                <h2 className="text-2xl font-black uppercase tracking-tight">{authView === 'login' ? 'Welcome Back' : 'Join Tournament'}</h2>
-                                <p className="text-slate-500 text-xs">{authView === 'login' ? 'Sign in to access your predictions' : 'Create your account to join the leaderboard'}</p>
-                             </div>
-                             {authError && <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl text-xs text-red-400 font-bold text-center">{authError}</div>}
-                             <form onSubmit={handleAuth} className="space-y-4">
-                                {authView === 'register' && (
-                                    <input type="text" placeholder="Your Name" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-emerald-500 outline-none" required />
-                                )}
-                                <input type="email" placeholder="Email Address" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-emerald-500 outline-none" required />
-                                <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-6 py-4 text-sm focus:border-emerald-500 outline-none" required />
-                                <button type="submit" className="w-full bg-emerald-500 text-slate-950 font-black py-4 rounded-2xl uppercase text-xs tracking-widest shadow-xl shadow-emerald-500/20">{authView === 'login' ? 'Sign In' : 'Register Now'}</button>
-                             </form>
-                             <div className="text-center">
-                                <button onClick={() => setAuthView(authView === 'login' ? 'register' : 'login')} className="text-[10px] font-black text-slate-500 uppercase hover:text-emerald-400 tracking-widest">{authView === 'login' ? "Don't have an account? Register" : "Already have an account? Sign In"}</button>
-                             </div>
-                        </div>
                     </div>
                 )}
             </div>
