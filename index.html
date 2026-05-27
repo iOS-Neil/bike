@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WC2026 Predictor Pro | Live API Sync</title>
+    <title>WC2026 Predictor Pro | Holiday Mode</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Firebase Legacy SDKs for maximum compatibility -->
+    <!-- Firebase Legacy SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
@@ -23,8 +23,6 @@
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .animate-in { animation: fadeIn 0.5s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        /* Custom scrollbar for predictions */
         .match-list { max-height: 70vh; overflow-y: auto; padding-right: 4px; }
         .match-list::-webkit-scrollbar { width: 4px; }
         .match-list::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
@@ -48,18 +46,54 @@
     const ADMIN_UID = "mJFQl94QpgMzbfi07u2EStaxDJZ2"; 
     const appId = "my-world-cup-predictor-2026";
 
-    // ... existing code ... ... existing code ...
+    const COUNTRY_FLAGS = {
+        "Mexico": "🇲🇽", "South Africa": "🇿🇦", "South Korea": "🇰🇷", "Czech Republic": "🇨🇿",
+        "Canada": "🇨🇦", "Bosnia": "🇧🇦", "Qatar": "🇶🇦", "Switzerland": "🇨🇭",
+        "Brazil": "🇧🇷", "Morocco": "🇲🇦", "Haiti": "🇭🇹", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+        "USA": "🇺🇸", "Paraguay": "🇵🇾", "Australia": "🇦🇺", "Turkey": "🇹🇷",
+        "Germany": "🇩🇪", "Curaçao": "🇨🇼", "Ivory Coast": "🇨🇮", "Ecuador": "🇪🇨",
+        "Netherlands": "🇳🇱", "Japan": "🇯🇵", "Sweden": "🇸🇪", "Tunisia": "🇹🇳",
+        "Belgium": "🇧🇪", "Egypt": "🇪🇬", "Iran": "🇮🇷", "New Zealand": "🇳🇿",
+        "Spain": "🇪🇸", "Cape Verde": "🇨🇻", "Saudi Arabia": "🇸🇦", "Uruguay": "🇺🇾"
+    };
+
+    const GROUPS_TEAMS = {
+        A: ["Mexico", "South Africa", "South Korea", "Czech Republic"],
+        B: ["Canada", "Bosnia", "Qatar", "Switzerland"],
+        C: ["Brazil", "Morocco", "Haiti", "Scotland"],
+        D: ["USA", "Paraguay", "Australia", "Turkey"],
+        E: ["Germany", "Curaçao", "Ivory Coast", "Ecuador"],
+        F: ["Netherlands", "Japan", "Sweden", "Tunisia"],
+        G: ["Belgium", "Egypt", "Iran", "New Zealand"],
+        H: ["Spain", "Cape Verde", "Saudi Arabia", "Uruguay"]
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    function App() {
+        const [user, setUser] = React.useState(null);
+        const [authLoading, setAuthLoading] = React.useState(true);
+        const [authView, setAuthView] = React.useState('none');
+        const [activeTab, setActiveTab] = React.useState('predictions');
+        const [activeGroup, setActiveGroup] = React.useState('A');
+        const [matches, setMatches] = React.useState([]);
+        const [predictions, setPredictions] = React.useState([]);
+        const [users, setUsers] = React.useState([]);
+        const [adminMode, setAdminMode] = React.useState(false);
+        const [syncStatus, setSyncStatus] = React.useState('Idle');
+
         React.useEffect(() => {
             auth.onAuthStateChanged(u => {
                 setUser(u);
                 setAuthLoading(false);
-                if (u) setAuthView('none');
+                if (!u) setAuthView('login');
             });
 
             db.ref(`artifacts/${appId}/public/data/matches`).on('value', snap => {
                 const data = snap.val() || {};
-                const list = Object.keys(data).map(k => ({ ...data[k], id: k }));
-                setMatches(list);
+                setMatches(Object.keys(data).map(k => ({ ...data[k], id: k })));
             });
 
             db.ref(`artifacts/${appId}/public/data/predictions`).on('value', snap => {
@@ -73,16 +107,11 @@
             });
         }, []);
 
-        const syncScoresFromAPI = async (currentMatches) => {
-            if (!API_TOKEN) {
-                setSyncStatus('❌ No API Token Configured');
-                return;
-            }
-            
-            setSyncStatus('🛰️ Requesting API Data...');
+        const syncScoresFromAPI = async () => {
+            if (!API_TOKEN) return;
+            setSyncStatus('🛰️ Connecting to API...');
             
             try {
-                // We use a dedicated proxy that specifically handles the API headers better
                 const apiUrl = 'https://api.football-data.org/v4/competitions/WC/matches';
                 const proxiedUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
                 
@@ -91,26 +120,21 @@
                 const data = JSON.parse(wrapper.contents);
                 
                 if (data.errorCode || data.message) {
-                    setSyncStatus(`❌ API Note: ${data.message || 'Resource Restricted'}`);
+                    setSyncStatus(`❌ API Error: ${data.message}`);
                     return;
                 }
 
-                if (data.matches && data.matches.length > 0) {
+                if (data.matches) {
                     const updates = {};
-                    let updatedCount = 0;
-
+                    let count = 0;
                     data.matches.forEach(apiMatch => {
-                        const dbMatch = currentMatches.find(m => 
-                            (m.home === (apiMatch.homeTeam.shortName || apiMatch.homeTeam.name)) &&
-                            (m.away === (apiMatch.awayTeam.shortName || apiMatch.awayTeam.name))
+                        const dbMatch = matches.find(m => 
+                            m.home === (apiMatch.homeTeam.shortName || apiMatch.homeTeam.name) &&
+                            m.away === (apiMatch.awayTeam.shortName || apiMatch.awayTeam.name)
                         );
 
                         if (dbMatch) {
-                            const apiStatus = apiMatch.status;
-                            let newStatus = 'UPCOMING';
-                            if (apiStatus === 'FINISHED') newStatus = 'FINISHED';
-                            else if (['IN_PLAY', 'PAUSED'].includes(apiStatus)) newStatus = 'LIVE';
-
+                            const newStatus = apiMatch.status === 'FINISHED' ? 'FINISHED' : (['IN_PLAY', 'PAUSED'].includes(apiMatch.status) ? 'LIVE' : 'UPCOMING');
                             const hScore = apiMatch.score.fullTime.home ?? 0;
                             const aScore = apiMatch.score.fullTime.away ?? 0;
 
@@ -123,22 +147,20 @@
                                     completed: newStatus === 'FINISHED',
                                     minute: apiMatch.minute || ''
                                 };
-                                updatedCount++;
+                                count++;
                             }
                         }
                     });
 
-                    if (updatedCount > 0) {
+                    if (count > 0) {
                         await db.ref().update(updates);
-                        setSyncStatus(`✅ Synced ${updatedCount} Results`);
+                        setSyncStatus(`✅ Synced ${count} matches!`);
                     } else {
-                        setSyncStatus('💤 Matches haven\'t started yet');
+                        setSyncStatus('💤 No live changes detected');
                     }
-                } else {
-                    setSyncStatus('⚠️ API returned no matches for WC2026 yet');
                 }
             } catch (err) {
-                setSyncStatus('❌ Sync Error (API Restricted or Offline)');
+                setSyncStatus('❌ Proxy/Network Failure');
             }
         };
 
@@ -147,15 +169,25 @@
             if (!m) return;
             let h = parseInt(m.homeScore) || 0;
             let a = parseInt(m.awayScore) || 0;
-            
             if (team === 'home') h = Math.max(0, h + change);
             else a = Math.max(0, a + change);
 
             db.ref(`artifacts/${appId}/public/data/matches/${matchId}`).update({
-                homeScore: h,
-                awayScore: a,
-                status: 'FINISHED',
-                completed: true
+                homeScore: h, awayScore: a, status: 'FINISHED', completed: true
+            });
+        };
+
+        const updatePrediction = (matchId, team, change) => {
+            if (!user) return;
+            const predId = `${user.uid}_${matchId}`;
+            const existing = predictions.find(p => p.id === predId) || { homePredict: 0, awayPredict: 0 };
+            let h = parseInt(existing.homePredict) || 0;
+            let a = parseInt(existing.awayPredict) || 0;
+            if (team === 'home') h = Math.max(0, h + change);
+            else a = Math.max(0, a + change);
+
+            db.ref(`artifacts/${appId}/public/data/predictions/${predId}`).set({
+                userId: user.uid, matchId, homePredict: h, awayPredict: a
             });
         };
 
@@ -171,30 +203,13 @@
                             const actA = parseInt(m.awayScore);
                             const prH = parseInt(p.homePredict);
                             const prA = parseInt(p.awayPredict);
-
                             if (actH === prH && actA === prA) pts += 5; 
-                            else if ((actH > actA && prH > prA) || (actH < actA && prH < prA) || (actH === actA && prH === prA)) {
-                                pts += 2; 
-                            }
+                            else if ((actH > actA && prH > prA) || (actH < actA && prH < prA) || (actH === actA && prH === prA)) pts += 2; 
                         }
                     });
                     return { ...u, points: pts };
                 }).sort((a, b) => b.points - a.points);
         }, [users, matches, predictions]);
-
-        const updatePrediction = (matchId, team, change) => {
-            if (!user) return;
-            const predId = `${user.uid}_${matchId}`;
-            const existing = predictions.find(p => p.id === predId) || { homePredict: 0, awayPredict: 0 };
-            let h = parseInt(existing.homePredict) || 0;
-            let a = parseInt(existing.awayPredict) || 0;
-            if (team === 'home') h = Math.max(0, h + change);
-            else a = Math.max(0, a + change);
-
-            db.ref(`artifacts/${appId}/public/data/predictions/${predId}`).set({
-                userId: user.uid, matchId, homePredict: h, awayPredict: a
-            });
-        };
 
         if (authLoading) return <div className="h-screen flex items-center justify-center text-emerald-500 font-black animate-pulse">CONNECTING...</div>;
 
@@ -217,7 +232,7 @@
                     </div>
                     
                     <div className="flex items-center gap-3">
-                        {user ? (
+                        {user && !user.isAnonymous ? (
                             <>
                                 <div className="bg-slate-900 border border-slate-800 px-4 py-2 rounded-2xl text-center">
                                     <p className="text-[9px] font-black text-slate-500 uppercase">Points</p>
@@ -242,8 +257,8 @@
                             <div className="text-xs font-black text-amber-500 uppercase tracking-widest">Holiday Admin Hub</div>
                          </div>
                          <div className="flex flex-wrap gap-3">
-                            <button onClick={() => syncScoresFromAPI(matches)} className="bg-amber-500 text-slate-900 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-amber-500/20 hover:scale-105 transition-all">Attempt API Sync</button>
-                            <p className="text-[9px] text-amber-500/70 font-bold max-w-[250px] leading-relaxed">Automatic sync is disabled. Use this button to try pulling scores, or use the <span className="text-amber-400 underline">+/- Buttons</span> on each match card for 100% reliable updates.</p>
+                            <button onClick={syncScoresFromAPI} className="bg-amber-500 text-slate-900 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-amber-500/20 hover:scale-105 transition-all">Attempt API Sync</button>
+                            <p className="text-[9px] text-amber-500/70 font-bold max-w-[250px] leading-relaxed">Update scores via API or use the <span className="text-amber-400 underline">+/- Buttons</span> on each card for manual holiday overrides.</p>
                          </div>
                     </div>
                 )}
@@ -252,7 +267,7 @@
                 {authView !== 'none' ? (
                     <div className="glass-card p-12 rounded-[3rem] text-center space-y-6 max-w-sm mx-auto">
                         <h2 className="text-2xl font-black uppercase tracking-tighter text-emerald-400">Welcome Back</h2>
-                        <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Sign in to sync your predictions</p>
+                        <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Sign in to manage predictions</p>
                         <form onSubmit={async (e) => {
                             e.preventDefault();
                             const email = e.target.email.value;
@@ -266,13 +281,13 @@
                                     await auth.signInWithEmailAndPassword(email, pass);
                                 }
                                 setAuthView('none');
-                            } catch (err) { alert("Auth failed. Check email/password."); }
+                            } catch (err) { console.error(err); }
                         }} className="space-y-3 text-slate-950">
-                             {authView === 'register' && <input name="display" type="text" placeholder="Your Name" className="w-full rounded-xl px-4 py-3 text-sm font-bold border border-slate-200" required />}
-                             <input name="email" type="email" placeholder="Email Address" className="w-full rounded-xl px-4 py-3 text-sm font-bold border border-slate-200" required />
-                             <input name="password" type="password" placeholder="Password" className="w-full rounded-xl px-4 py-3 text-sm font-bold border border-slate-200" required />
-                             <button className="w-full bg-emerald-500 text-slate-950 py-3 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">Go to Predictor</button>
-                             <button type="button" onClick={() => setAuthView(authView === 'login' ? 'register' : 'login')} className="text-[10px] text-slate-500 uppercase font-black hover:text-emerald-400 transition-colors">{authView === 'login' ? 'Need an account? Register' : 'Have an account? Login'}</button>
+                             {authView === 'register' && <input name="display" type="text" placeholder="Your Name" className="w-full rounded-xl px-4 py-3 text-sm font-bold border border-slate-200 outline-none focus:ring-2 ring-emerald-500" required />}
+                             <input name="email" type="email" placeholder="Email Address" className="w-full rounded-xl px-4 py-3 text-sm font-bold border border-slate-200 outline-none focus:ring-2 ring-emerald-500" required />
+                             <input name="password" type="password" placeholder="Password" className="w-full rounded-xl px-4 py-3 text-sm font-bold border border-slate-200 outline-none focus:ring-2 ring-emerald-500" required />
+                             <button className="w-full bg-emerald-500 text-slate-950 py-3 rounded-xl font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20">Enter Predictor</button>
+                             <button type="button" onClick={() => setAuthView(authView === 'login' ? 'register' : 'login')} className="text-[10px] text-slate-500 uppercase font-black hover:text-emerald-400 transition-colors">{authView === 'login' ? 'New here? Register' : 'Have account? Login'}</button>
                         </form>
                     </div>
                 ) : (
@@ -309,7 +324,7 @@
 
                                                 <div className="flex justify-between items-center mb-10 px-2">
                                                     <div className="text-center w-24">
-                                                        <span className="text-4xl block mb-3 filter drop-shadow-lg">{COUNTRY_FLAGS[m.home]}</span>
+                                                        <span className="text-4xl block mb-3 filter drop-shadow-lg">{COUNTRY_FLAGS[m.home] || '🏳️'}</span>
                                                         <span className="text-[10px] font-black text-slate-100 uppercase truncate block tracking-tighter">{m.home}</span>
                                                         {adminMode && (
                                                             <div className="flex justify-center gap-1 mt-2">
@@ -328,7 +343,7 @@
                                                         ) : <div className="text-[10px] font-black text-slate-800 bg-slate-900/50 px-3 py-1 rounded-full">VS</div>}
                                                     </div>
                                                     <div className="text-center w-24">
-                                                        <span className="text-4xl block mb-3 filter drop-shadow-lg">{COUNTRY_FLAGS[m.away]}</span>
+                                                        <span className="text-4xl block mb-3 filter drop-shadow-lg">{COUNTRY_FLAGS[m.away] || '🏳️'}</span>
                                                         <span className="text-[10px] font-black text-slate-100 uppercase truncate block tracking-tighter">{m.away}</span>
                                                         {adminMode && (
                                                             <div className="flex justify-center gap-1 mt-2">
@@ -383,15 +398,15 @@
                                         ))}
                                     </tbody>
                                 </table>
-                                {leaderboard.length === 0 && <div className="p-20 text-center text-slate-600 font-bold uppercase tracking-widest text-xs">No registered players yet</div>}
+                                {leaderboard.length === 0 && <div className="p-20 text-center text-slate-600 font-bold uppercase tracking-widest text-xs">No active players yet</div>}
                             </div>
                         )}
                     </div>
                 )}
 
                 <footer className="py-12 text-center space-y-2">
-                    <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em]">Live Forecast Sync v2.1</p>
-                    <p className="text-[8px] font-bold text-slate-800 uppercase tracking-widest">API Data via Football-Data.org (15m Delay)</p>
+                    <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em]">Autonomous Forecast Port v3.0</p>
+                    <p className="text-[8px] font-bold text-slate-800 uppercase tracking-widest">API Data Source Enabled</p>
                 </footer>
             </div>
         );
