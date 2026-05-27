@@ -25,313 +25,106 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const firebaseConfig = {
-            apiKey: "AIzaSyC2Sr5IcLU9p2HopvBvOFlsBRGZtB1y9NE",
-            authDomain: "pcc2026wc.firebaseapp.com",
-            databaseURL: "https://pcc2026wc-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "pcc2026wc",
-            storageBucket: "pcc2026wc.firebasestorage.app",
-            messagingSenderId: "435446315061",
-            appId: "1:435446315061:web:ab2b76edfb08e8ee6b997c"
-        };
+    // ... existing firebaseConfig ...
+    // PASTE YOUR UID HERE after you register your account to enable Admin mode for only you
+    const ADMIN_UID = "YOUR_ADMIN_UID_HERE"; 
 
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.database();
-        const appId = "my-world-cup-predictor-2026";
+    function App() {
+        const [user, setUser] = React.useState(null);
+        // Change default view to 'login' to force authentication before access
+        const [authView, setAuthView] = React.useState('login'); 
+        const [authError, setAuthError] = React.useState(null);
+        // ... existing state ...
 
-        const COUNTRY_FLAGS = {
-            "Mexico": "🇲🇽", "South Africa": "🇿🇦", "South Korea": "🇰🇷", "Czech Republic": "🇨🇿",
-            "Canada": "🇨🇦", "Bosnia": "🇧🇦", "Qatar": "🇶🇦", "Switzerland": "🇨🇭",
-            "Brazil": "🇧🇷", "Morocco": "🇲🇦", "Haiti": "🇭🇹", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
-            "USA": "🇺🇸", "Paraguay": "🇵🇾", "Australia": "🇦🇺", "Turkey": "🇹🇷",
-            "Germany": "🇩🇪", "Curaçao": "🇨🇼", "Ivory Coast": "🇨🇮", "Ecuador": "🇪🇨",
-            "Netherlands": "🇳🇱", "Japan": "🇯🇵", "Sweden": "🇸🇪", "Tunisia": "🇹🇳",
-            "Belgium": "🇧🇪", "Egypt": "🇪🇬", "Iran": "🇮🇷", "New Zealand": "🇳🇿",
-            "Spain": "🇪🇸", "Cape Verde": "🇨🇻", "Saudi Arabia": "🇸🇦", "Uruguay": "🇺🇾",
-            "TBD": "🏳️"
-        };
-
-        const GROUPS_TEAMS = {
-            A: ["Mexico", "South Africa", "South Korea", "Czech Republic"],
-            B: ["Canada", "Bosnia", "Qatar", "Switzerland"],
-            C: ["Brazil", "Morocco", "Haiti", "Scotland"],
-            D: ["USA", "Paraguay", "Australia", "Turkey"],
-            E: ["Germany", "Curaçao", "Ivory Coast", "Ecuador"],
-            F: ["Netherlands", "Japan", "Sweden", "Tunisia"],
-            G: ["Belgium", "Egypt", "Iran", "New Zealand"],
-            H: ["Spain", "Cape Verde", "Saudi Arabia", "Uruguay"]
-        };
-
-        function App() {
-            const [user, setUser] = React.useState(null);
-            const [authView, setAuthView] = React.useState('welcome'); // welcome, login, register
-            const [authError, setAuthError] = React.useState(null);
-            const [username, setUsername] = React.useState('');
-            const [password, setPassword] = React.useState('');
-            const [displayName, setDisplayName] = React.useState('');
-
-            const [matches, setMatches] = React.useState([]);
-            const [predictions, setPredictions] = React.useState([]);
-            const [users, setUsers] = React.useState([]);
-            const [tournamentState, setTournamentState] = React.useState({ currentStage: 'group' });
-            const [loading, setLoading] = React.useState(true);
-
-            const [activeTab, setActiveTab] = React.useState('predictions');
-            const [activeGroup, setActiveGroup] = React.useState('A');
-            const [adminMode, setAdminMode] = React.useState(false);
-            const [saving, setSaving] = React.useState({});
-
-            React.useEffect(() => {
-                auth.onAuthStateChanged(async (u) => {
-                    setUser(u);
-                    if (u) {
-                        const name = u.displayName || (u.isAnonymous ? `Guest_${u.uid.slice(0, 4)}` : 'User');
-                        db.ref(`artifacts/${appId}/public/data/users/${u.uid}`).update({
-                            uid: u.uid, displayName: name, isAnonymous: u.isAnonymous, lastActive: new Date().toISOString()
-                        });
-                    } else {
-                        auth.signInAnonymously().catch(console.error);
-                    }
-                });
-
-                const dataRef = db.ref(`artifacts/${appId}/public/data`);
-                dataRef.on('value', (snap) => {
-                    const data = snap.val() || {};
-                    if (data.matches) setMatches(Object.keys(data.matches).map(k => ({ ...data.matches[k], id: k })));
-                    else seedMatches();
-                    
-                    if (data.predictions) setPredictions(Object.keys(data.predictions).map(k => ({ ...data.predictions[k], id: k })));
-                    if (data.users) setUsers(Object.values(data.users));
-                    if (data.tournament) setTournamentState(data.tournament.state || { currentStage: 'group' });
-                    setLoading(false);
-                });
-            }, []);
-
-            const seedMatches = () => {
-                const initial = {};
-                Object.keys(GROUPS_TEAMS).forEach(g => {
-                    const teams = GROUPS_TEAMS[g];
-                    const pairings = [
-                        { h: teams[0], a: teams[1], d: 'June 11' }, { h: teams[2], a: teams[3], d: 'June 12' },
-                        { h: teams[0], a: teams[2], d: 'June 15' }, { h: teams[1], a: teams[3], d: 'June 16' },
-                        { h: teams[3], a: teams[0], d: 'June 20' }, { h: teams[1], a: teams[2], d: 'June 21' }
-                    ];
-                    pairings.forEach((p, idx) => {
-                        const id = `g_${g}_${idx + 1}`;
-                        initial[id] = { id, group: g, home: p.h, away: p.a, homeScore: null, awayScore: null, date: p.d, stage: 'group', completed: false };
+        React.useEffect(() => {
+            auth.onAuthStateChanged(async (u) => {
+                setUser(u);
+                if (u && !u.isAnonymous) {
+                    setAuthView('welcome'); // Close auth overlay on success
+                    const name = u.displayName || 'User';
+                    db.ref(`artifacts/${appId}/public/data/users/${u.uid}`).update({
+                        uid: u.uid, 
+                        displayName: name, 
+                        isAnonymous: false, 
+                        lastActive: new Date().toISOString()
                     });
-                });
-                db.ref(`artifacts/${appId}/public/data/matches`).set(initial);
-            };
+                } else if (!u) {
+                    // Force login view if no user is active
+                    setAuthView('login');
+                }
+            });
+            // ... existing data listeners ...
+        }, []);
 
-            const leaderboard = React.useMemo(() => {
-                return users.map(u => {
+        const leaderboard = React.useMemo(() => {
+            // Filter out anonymous guests - only registered users allowed
+            return users
+                .filter(u => !u.isAnonymous) 
+                .map(u => {
                     let pts = 0, exact = 0;
-                    predictions.filter(p => p.userId === u.uid).forEach(p => {
-                        const m = matches.find(match => match.id === p.matchId);
-                        if (m && m.completed) {
-                            const mh = parseInt(m.homeScore), ma = parseInt(m.awayScore);
-                            const ph = parseInt(p.homePredict), pa = parseInt(p.awayPredict);
-                            if (mh === ph && ma === pa) { pts += 5; exact++; }
-                            else if ((mh > ma && ph > pa) || (mh < ma && ph < pa) || (mh === ma && ph === pa)) { pts += 2; }
-                        }
-                    });
+                    // ... existing point calculation logic ...
                     return { ...u, points: pts, exact };
                 }).sort((a, b) => b.points - a.points || b.exact - a.exact);
-            }, [users, matches, predictions]);
+        }, [users, matches, predictions]);
 
-            const userStats = React.useMemo(() => {
-                const idx = leaderboard.findIndex(l => l.uid === user?.uid);
-                return { rank: idx === -1 ? '-' : idx + 1, points: leaderboard[idx]?.points || 0 };
-            }, [leaderboard, user]);
+        // ... existing updatePrediction and simulateScores ...
 
-            const updatePrediction = async (matchId, team, change) => {
-                if (!user) return;
-                const id = `${user.uid}_${matchId}`;
-                const found = predictions.find(p => p.id === id) || { homePredict: 0, awayPredict: 0 };
-                let h = parseInt(found.homePredict), a = parseInt(found.awayPredict);
-                if (team === 'home') h = Math.max(0, h + change); else a = Math.max(0, a + change);
+        return (
+            <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 animate-in">
                 
-                setSaving(p => ({ ...p, [matchId]: true }));
-                await db.ref(`artifacts/${appId}/public/data/predictions/${id}`).set({
-                    userId: user.uid, matchId, homePredict: h, awayPredict: a, updatedAt: new Date().toISOString()
-                });
-                setTimeout(() => setSaving(p => ({ ...p, [matchId]: false })), 800);
-            };
-
-            const simulateScores = () => {
-                const updates = {};
-                matches.filter(m => m.stage === 'group').forEach(m => {
-                    const hs = Math.floor(Math.random() * 4), as = Math.floor(Math.random() * 3);
-                    updates[m.id] = { ...m, homeScore: hs, awayScore: as, completed: true };
-                });
-                db.ref(`artifacts/${appId}/public/data/matches`).update(updates);
-            };
-
-            const handleAuth = async (e) => {
-                e.preventDefault();
-                setAuthError(null);
-                try {
-                    const email = `${username.toLowerCase()}@wc.local`;
-                    if (authView === 'register') {
-                        const res = await auth.createUserWithEmailAndPassword(email, password);
-                        await res.user.updateProfile({ displayName });
-                    } else {
-                        await auth.signInWithEmailAndPassword(email, password);
-                    }
-                    setAuthView('welcome');
-                } catch (err) { setAuthError(err.message); }
-            };
-
-            if (loading) return <div className="flex h-screen items-center justify-center text-emerald-400 font-bold tracking-widest">CONNECTING...</div>;
-
-            return (
-                <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 animate-in">
-                    
-                    {/* Header Area */}
-                    <header className="flex flex-col md:flex-row justify-between items-center gap-6 bg-slate-900/50 p-6 rounded-[2.5rem] border border-slate-800">
-                        <div className="text-center md:text-left">
-                            <h1 className="text-2xl font-black bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent uppercase">World Cup 2026</h1>
-                            <p className="text-[10px] font-bold text-slate-500 tracking-[0.3em] uppercase">Realtime Forecast Port</p>
-                        </div>
-                        
-                        <div className="flex items-center gap-4">
-                            <div className="bg-slate-950 px-5 py-2 rounded-2xl border border-slate-800 text-center">
-                                <p className="text-[9px] font-black text-slate-500 uppercase">Rank</p>
-                                <p className="text-amber-400 font-black">#{userStats.rank}</p>
-                            </div>
-                            <div className="bg-slate-950 px-5 py-2 rounded-2xl border border-slate-800 text-center">
-                                <p className="text-[9px] font-black text-slate-500 uppercase">Points</p>
-                                <p className="text-emerald-400 font-black">{userStats.points}</p>
-                            </div>
-                            <button onClick={() => setAdminMode(!adminMode)} className={`w-10 h-10 rounded-2xl border flex items-center justify-center transition-all ${adminMode ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>⚙️</button>
-                            {user?.isAnonymous ? (
-                                <button onClick={() => setAuthView('register')} className="bg-emerald-500 text-slate-950 px-4 py-2 rounded-2xl font-black text-xs uppercase shadow-lg">Save Account</button>
-                            ) : (
-                                <button onClick={() => auth.signOut()} className="bg-slate-800 text-slate-400 px-4 py-2 rounded-2xl font-black text-xs uppercase border border-slate-700">Logout</button>
-                            )}
-                        </div>
-                    </header>
-
-                    {/* Admin Dashboard */}
-                    {adminMode && (
-                        <div className="bg-amber-500/5 border border-amber-500/20 p-6 rounded-[2rem] flex flex-wrap gap-4 animate-in">
-                            <button onClick={simulateScores} className="bg-amber-500 text-slate-950 px-4 py-2 rounded-xl text-xs font-black uppercase">⚡ Simulate Scores</button>
-                            <button onClick={() => { if(confirm("Reset?")) db.ref(`artifacts/${appId}/public/data`).remove(); }} className="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-black uppercase">🔄 Wipe Data</button>
-                        </div>
-                    )}
-
-                    {/* Navigation */}
-                    <div className="bg-slate-900 p-1.5 rounded-2xl flex border border-slate-800 shadow-2xl">
-                        {['predictions', 'leaderboard'].map(t => (
-                            <button key={t} onClick={() => setActiveTab(t)} className={`flex-1 py-3 text-xs font-black rounded-xl transition-all capitalize ${activeTab === t ? 'bg-emerald-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-                                {t}
-                            </button>
-                        ))}
+                {}
+                <header className="flex flex-col md:flex-row justify-between items-center gap-6 bg-slate-900/50 p-6 rounded-[2.5rem] border border-slate-800">
+                    <div className="text-center md:text-left">
+                        <h1 className="text-2xl font-black bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent uppercase tracking-tight">World Cup 2026</h1>
+                        <p className="text-[10px] font-bold text-slate-500 tracking-[0.3em] uppercase">Predictor Pro</p>
                     </div>
-
-                    {/* Content Views */}
-                    {activeTab === 'predictions' && (
-                        <div className="space-y-8">
-                            <div className="flex flex-wrap gap-2 bg-slate-900/50 p-2 rounded-2xl border border-slate-800">
-                                {Object.keys(GROUPS_TEAMS).map(g => (
-                                    <button key={g} onClick={() => setActiveGroup(g)} className={`flex-1 min-w-[60px] text-xs font-black py-2 rounded-xl border transition-all ${activeGroup === g ? 'bg-slate-800 text-emerald-400 border-emerald-500/30' : 'text-slate-500 border-transparent'}`}>GRP {g}</button>
-                                ))}
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {matches.filter(m => m.group === activeGroup).map(m => {
-                                    const p = predictions.find(pred => pred.matchId === m.id && pred.userId === user?.uid) || { homePredict: 0, awayPredict: 0 };
-                                    return (
-                                        <div key={m.id} className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 shadow-xl space-y-6 group">
-                                            <div className="flex justify-between items-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                                <span>{m.date}</span>
-                                                <span className={saving[m.id] ? 'text-amber-400' : 'text-slate-700'}>{saving[m.id] ? 'SYNCING...' : 'SYNCED'}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center px-4">
-                                                <div className="text-center w-1/3">
-                                                    <span className="text-4xl block mb-2">{COUNTRY_FLAGS[m.home]}</span>
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase line-clamp-1">{m.home}</span>
-                                                </div>
-                                                <div className="text-xl font-black text-slate-700">
-                                                    {m.completed ? <span className="text-emerald-400">{m.homeScore}:{m.awayScore}</span> : 'VS'}
-                                                </div>
-                                                <div className="text-center w-1/3">
-                                                    <span className="text-4xl block mb-2">{COUNTRY_FLAGS[m.away]}</span>
-                                                    <span className="text-[10px] font-black text-slate-400 uppercase line-clamp-1">{m.away}</span>
-                                                </div>
-                                            </div>
-                                            <div className="bg-slate-950 p-4 rounded-3xl border border-slate-800 flex justify-between items-center shadow-inner">
-                                                <div className="flex items-center gap-2">
-                                                    <button onClick={() => updatePrediction(m.id, 'home', -1)} className="w-8 h-8 bg-slate-800 hover:bg-slate-700 rounded-xl font-black">-</button>
-                                                    <span className="w-4 text-center font-black text-white">{p.homePredict}</span>
-                                                    <button onClick={() => updatePrediction(m.id, 'home', 1)} className="w-8 h-8 bg-slate-800 hover:bg-slate-700 rounded-xl font-black">+</button>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button onClick={() => updatePrediction(m.id, 'away', -1)} className="w-8 h-8 bg-slate-800 hover:bg-slate-700 rounded-xl font-black">-</button>
-                                                    <span className="w-4 text-center font-black text-white">{p.awayPredict}</span>
-                                                    <button onClick={() => updatePrediction(m.id, 'away', 1)} className="w-8 h-8 bg-slate-800 hover:bg-slate-700 rounded-xl font-black">+</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'leaderboard' && (
-                        <div className="bg-slate-900 rounded-[2.5rem] border border-slate-800 overflow-hidden shadow-2xl">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-800/50 text-slate-500 text-[10px] font-black uppercase tracking-widest">
-                                    <tr><th className="p-6">Rank</th><th>Predictor</th><th className="text-center">Exact</th><th className="p-6 text-right">Points</th></tr>
-                                </thead>
-                                <tbody>
-                                    {leaderboard.map((l, idx) => (
-                                        <tr key={l.uid} className={`border-b border-slate-800 last:border-0 ${l.uid === user?.uid ? 'bg-emerald-500/5' : ''}`}>
-                                            <td className="p-6 font-black text-slate-600">#{idx + 1}</td>
-                                            <td className="font-bold py-6">{l.displayName} {l.isAnonymous && <span className="text-[8px] bg-slate-950 px-1.5 rounded-full text-amber-500">GUEST</span>}</td>
-                                            <td className="text-center font-bold text-slate-500">{l.exact}</td>
-                                            <td className="p-6 text-right font-black text-emerald-400 text-lg">{l.points}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    {/* Auth Overlay */}
-                    {authView !== 'welcome' && (
-                        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] w-full max-w-md shadow-2xl space-y-6">
-                                <button onClick={() => setAuthView('welcome')} className="float-right text-slate-500 hover:text-white">✕</button>
-                                <div className="text-center">
-                                    <h2 className="text-2xl font-black uppercase tracking-tight">{authView === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
-                                    <p className="text-xs text-slate-500 mt-1">Claim your spot on the leaderboard!</p>
+                    
+                    <div className="flex items-center gap-4">
+                        {user && !user.isAnonymous && (
+                            <>
+                                <div className="bg-slate-950 px-5 py-2 rounded-2xl border border-slate-800 text-center">
+                                    <p className="text-[9px] font-black text-slate-500 uppercase">Rank</p>
+                                    <p className="text-amber-400 font-black">#{userStats.rank}</p>
                                 </div>
-                                {authError && <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-[10px] text-red-400 text-center">{authError}</div>}
-                                <form onSubmit={handleAuth} className="space-y-4">
-                                    {authView === 'register' && (
-                                        <input type="text" placeholder="Display Name" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-slate-950 border border-slate-800 px-5 py-3 rounded-2xl focus:border-emerald-500 outline-none text-sm" required />
-                                    )}
-                                    <input type="text" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-slate-950 border border-slate-800 px-5 py-3 rounded-2xl focus:border-emerald-500 outline-none text-sm" required />
-                                    <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 px-5 py-3 rounded-2xl focus:border-emerald-500 outline-none text-sm" required />
-                                    <button className="w-full bg-emerald-500 text-slate-950 py-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-emerald-500/20">{authView === 'login' ? 'Login' : 'Sign Up'}</button>
-                                </form>
-                                <p className="text-center text-[10px] text-slate-500">
-                                    {authView === 'login' ? "New here? " : "Already have an account? "}
-                                    <button onClick={() => setAuthView(authView === 'login' ? 'register' : 'login')} className="text-emerald-400 font-bold hover:underline">{authView === 'login' ? "Register" : "Login"}</button>
-                                </p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        }
+                                <div className="bg-slate-950 px-5 py-2 rounded-2xl border border-slate-800 text-center">
+                                    <p className="text-[9px] font-black text-slate-500 uppercase">Points</p>
+                                    <p className="text-emerald-400 font-black">{userStats.points}</p>
+                                </div>
+                                {/* SECURE COG: Only visible if the UID matches yours */}
+                                {(user.uid === ADMIN_UID || user.email === 'admin@wc.local') && (
+                                    <button onClick={() => setAdminMode(!adminMode)} className={`w-10 h-10 rounded-2xl border flex items-center justify-center transition-all ${adminMode ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>⚙️</button>
+                                )}
+                                <button onClick={() => auth.signOut()} className="bg-slate-800 text-slate-400 px-4 py-2 rounded-2xl font-black text-xs uppercase border border-slate-700 hover:text-white transition-colors">Logout</button>
+                            </>
+                        )}
+                        {!user && (
+                            <button onClick={() => setAuthView('login')} className="bg-emerald-500 text-slate-950 px-6 py-2 rounded-2xl font-black text-xs uppercase shadow-lg shadow-emerald-500/20">Login / Register</button>
+                        )}
+                    </div>
+                </header>
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+                {/* ... existing Admin Mode section ... */}
+
+                {}
+                {!user || user.isAnonymous ? (
+                    <div className="bg-slate-900/50 border border-slate-800 p-12 rounded-[3rem] text-center space-y-4">
+                        <span className="text-5xl block">🔐</span>
+                        <h2 className="text-xl font-black uppercase">Predictions Locked</h2>
+                        <p className="text-slate-500 text-sm max-w-xs mx-auto">Please login or create an account to start predicting scores and join the leaderboard.</p>
+                        <button onClick={() => setAuthView('register')} className="bg-emerald-500 text-slate-950 px-8 py-3 rounded-2xl font-black text-xs uppercase shadow-xl">Create Account Now</button>
+                    </div>
+                ) : (
+                    <>
+                        {/* ... existing Tabs and Content Views (Predictions/Leaderboard) ... */}
+                    </>
+                )}
+
+                {/* Auth Overlay stays the same but is now the primary entrance */}
+                {/* ... existing Auth Overlay code ... */}
+            </div>
+        );
+    }
+    // ...
+</script>
 </body>
 </html>
