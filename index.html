@@ -31,6 +31,7 @@
     };
 
     const API_TOKEN = "5c19fe248b844cf6b7673905997c9ad4";
+    // PASTE YOUR UID HERE:
     const ADMIN_UID = "mJFQl94QpgMzbfi07u2EStaxDJZ2"; 
     const appId = "my-world-cup-predictor-2026";
 
@@ -63,7 +64,9 @@
     function App() {
         const [user, setUser] = React.useState(null);
         const [authLoading, setAuthLoading] = React.useState(true);
-        const [authView, setAuthView] = React.useState('none');
+        const [authView, setAuthView] = React.useState('login');
+        const [username, setUsername] = React.useState('');
+        const [password, setPassword] = React.useState('');
         const [matches, setMatches] = React.useState([]);
         const [predictions, setPredictions] = React.useState([]);
         const [users, setUsers] = React.useState([]);
@@ -106,21 +109,42 @@
                     headers: { 'X-Auth-Token': API_TOKEN }
                 });
                 const data = await response.json();
-                const matchesData = JSON.parse(data.contents).matches;
                 setSyncStatus('✅ Sync Successful');
             } catch (err) {
                 setSyncStatus('❌ Sync Failed');
             }
         };
 
+        const handleAuth = async (e) => {
+            e.preventDefault();
+            try {
+                if (authView === 'login') await auth.signInWithEmailAndPassword(`${username}@wc.com`, password);
+                else {
+                    await auth.createUserWithEmailAndPassword(`${username}@wc.com`, password);
+                    await db.ref(`artifacts/${appId}/public/data/users/${auth.currentUser.uid}`).set({ name: username });
+                }
+            } catch (err) { alert(err.message); }
+        };
+
         if (authLoading) return <div className="p-4">Loading...</div>;
+        if (!user) return (
+            <div className="max-w-md mx-auto p-10 glass-card rounded-3xl mt-20">
+                <h2 className="text-2xl font-black mb-6 text-emerald-400">{authView === 'login' ? 'LOGIN' : 'REGISTER'}</h2>
+                <form onSubmit={handleAuth} className="space-y-4">
+                    <input className="w-full bg-slate-800 p-3 rounded-xl" placeholder="Username" onChange={e => setUsername(e.target.value)} />
+                    <input className="w-full bg-slate-800 p-3 rounded-xl" type="password" placeholder="Password" onChange={e => setPassword(e.target.value)} />
+                    <button className="w-full bg-emerald-500 p-3 rounded-xl font-bold">SUBMIT</button>
+                </form>
+                <p className="mt-4 text-xs text-slate-500 cursor-pointer underline" onClick={() => setAuthView(authView === 'login' ? 'reg' : 'login')}>Toggle Login/Register</p>
+            </div>
+        );
 
         return (
             <div className="max-w-4xl mx-auto p-4">
                 <header className="flex justify-between items-center glass-card p-6 rounded-3xl mb-6">
                     <div>
                         <h1 className="font-black text-emerald-400">WC PREDICTOR 2026</h1>
-                        {user && <p className="text-[10px] text-slate-500">YOUR UID: {user.uid}</p>}
+                        <p className="text-[10px] text-slate-500">UID: {user.uid}</p>
                     </div>
                     <div className="flex gap-4">
                         {user?.uid === ADMIN_UID && <button onClick={() => setAdminMode(!adminMode)} className="bg-amber-500 text-black px-4 py-2 rounded-xl font-bold">⚙️</button>}
@@ -147,7 +171,7 @@
                                 {m.completed && <span className="bg-emerald-500 text-[10px] px-2 py-0.5 rounded-full font-bold">FT</span>}
                             </div>
                             <div className="flex justify-between items-center my-4">
-                                <span className="font-bold">{m.home}</span>
+                                <span className="text-2xl">{COUNTRY_FLAGS[m.home] || '🏳️'}</span>
                                 <div className="flex items-center gap-2">
                                     {adminMode ? (
                                         <>
@@ -169,7 +193,7 @@
                                         <span className="text-xl font-bold">{m.awayScore}</span>
                                     )}
                                 </div>
-                                <span className="font-bold">{m.away}</span>
+                                <span className="text-2xl">{COUNTRY_FLAGS[m.away] || '🏳️'}</span>
                             </div>
                             {adminMode && <button onClick={() => updateMatch(m.id, 'completed', !m.completed)} className={`w-full rounded py-1 font-bold ${m.completed ? 'bg-slate-800' : 'bg-emerald-500'}`}>{m.completed ? 'Re-open Match' : 'Mark Finished'}</button>}
                         </div>
