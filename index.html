@@ -30,6 +30,7 @@
         appId: "1:435446315061:web:ab2b76edfb08e8ee6b997c"
     };
 
+    // PASTE YOUR UID HERE:
     const ADMIN_UID = "mJFQl94QpgMzbfi07u2EStaxDJZ2"; 
     const appId = "my-world-cup-predictor-2026";
 
@@ -38,7 +39,7 @@
         "Canada": "🇨🇦", "Bosnia": "🇧🇦", "Qatar": "🇶🇦", "Switzerland": "🇨🇭",
         "Brazil": "🇧🇷", "Morocco": "🇲🇦", "Haiti": "🇭🇹", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
         "USA": "🇺🇸", "Paraguay": "🇵🇾", "Australia": "🇦🇺", "Turkey": "🇹🇷",
-        "Germany": "🇩🇪", "Curaçao": "🇨🇼", "Ivory Coast": "🇨🇮", "Ecuador": "🇨🇪",
+        "Germany": "🇩🇪", "Curaçao": "🇨🇼", "Ivory Coast": "🇨🇮", "Ecuador": "🇪🇨",
         "Netherlands": "🇳🇱", "Japan": "🇯🇵", "Sweden": "🇸🇪", "Tunisia": "🇹🇳",
         "Belgium": "🇧🇪", "Egypt": "🇪🇬", "Iran": "🇮🇷", "New Zealand": "🇳🇿",
         "Spain": "🇪🇸", "Cape Verde": "🇨🇻", "Saudi Arabia": "🇸🇦", "Uruguay": "🇺🇾"
@@ -66,15 +67,14 @@
         const [email, setEmail] = React.useState('');
         const [password, setPassword] = React.useState('');
         const [matches, setMatches] = React.useState([]);
+        const [predictions, setPredictions] = React.useState({});
         const [adminMode, setAdminMode] = React.useState(false);
         const [activeGroup, setActiveGroup] = React.useState('A');
 
         React.useEffect(() => {
             auth.onAuthStateChanged(u => { setUser(u); setAuthLoading(false); });
-            db.ref(`artifacts/${appId}/public/data/matches`).on('value', snap => {
-                const data = snap.val() || {};
-                setMatches(Object.keys(data).map(k => ({ ...data[k], id: k })));
-            });
+            db.ref(`artifacts/${appId}/public/data/matches`).on('value', snap => setMatches(Object.values(snap.val() || {})));
+            db.ref(`artifacts/${appId}/public/data/predictions`).on('value', snap => setPredictions(snap.val() || {}));
         }, []);
 
         const seedMatches = () => {
@@ -89,21 +89,23 @@
                     { home: teams[3], away: teams[0], date: "June 20" },
                     { home: teams[1], away: teams[2], date: "June 21" }
                 ];
-                groupMatches.forEach((m, i) => matches[`g_${g}_${i}`] = { ...m, group: g, homeScore: 0, awayScore: 0, completed: false });
+                groupMatches.forEach((m, i) => matches[`g_${g}_${i}`] = { ...m, id: `g_${g}_${i}`, group: g, homeScore: 0, awayScore: 0, completed: false });
             });
             db.ref(`artifacts/${appId}/public/data/matches`).set(matches);
         };
 
         const updateMatch = (id, field, val) => db.ref(`artifacts/${appId}/public/data/matches/${id}`).update({ [field]: val });
+        const updatePrediction = (matchId, field, val) => {
+            const predId = `${user.uid}_${matchId}`;
+            const current = predictions[predId] || { home: 0, away: 0 };
+            db.ref(`artifacts/${appId}/public/data/predictions/${predId}`).set({ ...current, [field]: val });
+        };
 
         const handleAuth = async (e) => {
             e.preventDefault();
             try {
                 if (authView === 'login') await auth.signInWithEmailAndPassword(email, password);
-                else {
-                    await auth.createUserWithEmailAndPassword(email, password);
-                    await db.ref(`artifacts/${appId}/public/data/users/${auth.currentUser.uid}`).set({ name: email });
-                }
+                else await auth.createUserWithEmailAndPassword(email, password);
             } catch (err) { alert(err.message); }
         };
 
@@ -112,7 +114,7 @@
             <div className="max-w-md mx-auto p-10 glass-card rounded-3xl mt-20">
                 <h2 className="text-2xl font-black mb-6 text-emerald-400">{authView === 'login' ? 'LOGIN' : 'REGISTER'}</h2>
                 <form onSubmit={handleAuth} className="space-y-4">
-                    <input className="w-full bg-slate-800 p-3 rounded-xl" placeholder="Email Address" onChange={e => setEmail(e.target.value)} />
+                    <input className="w-full bg-slate-800 p-3 rounded-xl" placeholder="Email" onChange={e => setEmail(e.target.value)} />
                     <input className="w-full bg-slate-800 p-3 rounded-xl" type="password" placeholder="Password" onChange={e => setPassword(e.target.value)} />
                     <button className="w-full bg-emerald-500 p-3 rounded-xl font-bold">SUBMIT</button>
                 </form>
@@ -134,7 +136,7 @@
                 </header>
 
                 {adminMode && (
-                    <div className="glass-card p-6 mb-6 rounded-3xl">
+                    <div className="glass-card p-6 mb-6 rounded-3xl space-y-4">
                         <button onClick={seedMatches} className="bg-red-500 text-white px-4 py-2 rounded-xl text-sm w-full font-bold">Reset All Matches (Use after code update)</button>
                     </div>
                 )}
@@ -146,44 +148,32 @@
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {matches.filter(m => m.group === activeGroup).map(m => (
-                        <div key={m.id} className="glass-card p-4 rounded-2xl">
-                            <div className="flex justify-between items-center mb-2">
-                                <p className="text-xs font-bold text-slate-400">{m.date} - Group {m.group}</p>
+                    {matches.filter(m => m.group === activeGroup).map(m => {
+                        const pred = predictions[`${user.uid}_${m.id}`] || { home: 0, away: 0 };
+                        return (
+                            <div key={m.id} className="glass-card p-4 rounded-2xl">
+                                <p className="text-xs font-bold text-slate-400 mb-4">{m.date} - Group {m.group}</p>
+                                <div className="flex justify-between items-center mb-4">
+                                    <div className="flex items-center gap-2"><span className="text-2xl">{COUNTRY_FLAGS[m.home]}</span><span className="font-bold">{m.home}</span></div>
+                                    <span className="text-xl font-bold">{m.homeScore} : {m.awayScore}</span>
+                                    <div className="flex items-center gap-2"><span className="font-bold">{m.away}</span><span className="text-2xl">{COUNTRY_FLAGS[m.away]}</span></div>
+                                </div>
+                                <div className="bg-slate-950 p-3 rounded-xl flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-500">YOUR PREDICTION</span>
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex gap-2 items-center"><button onClick={() => updatePrediction(m.id, 'home', Math.max(0, pred.home - 1))} className="bg-slate-800 px-2 rounded">-</button><span>{pred.home}</span><button onClick={() => updatePrediction(m.id, 'home', pred.home + 1)} className="bg-slate-800 px-2 rounded">+</button></div>
+                                        <div className="flex gap-2 items-center"><button onClick={() => updatePrediction(m.id, 'away', Math.max(0, pred.away - 1))} className="bg-slate-800 px-2 rounded">-</button><span>{pred.away}</span><button onClick={() => updatePrediction(m.id, 'away', pred.away + 1)} className="bg-slate-800 px-2 rounded">+</button></div>
+                                    </div>
+                                </div>
+                                {adminMode && (
+                                    <div className="flex gap-2 mt-4 pt-4 border-t border-slate-700">
+                                        <button onClick={() => updateMatch(m.id, 'homeScore', m.homeScore + 1)} className="bg-amber-600 px-2 rounded text-xs">Home +</button>
+                                        <button onClick={() => updateMatch(m.id, 'awayScore', m.awayScore + 1)} className="bg-amber-600 px-2 rounded text-xs">Away +</button>
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex justify-between items-center my-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-2xl">{COUNTRY_FLAGS[m.home] || '🏳️'}</span>
-                                    <span className="font-bold">{m.home}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {adminMode ? (
-                                        <>
-                                            <button onClick={() => updateMatch(m.id, 'homeScore', Math.max(0, m.homeScore - 1))} className="bg-slate-800 px-2 rounded">-</button>
-                                            <span className="w-8 text-center text-emerald-400 font-bold">{m.homeScore}</span>
-                                            <button onClick={() => updateMatch(m.id, 'homeScore', m.homeScore + 1)} className="bg-slate-800 px-2 rounded">+</button>
-                                        </>
-                                    ) : (
-                                        <span className="text-xl font-bold">{m.homeScore}</span>
-                                    )}
-                                    <span className="text-slate-600">:</span>
-                                    {adminMode ? (
-                                        <>
-                                            <button onClick={() => updateMatch(m.id, 'awayScore', Math.max(0, m.awayScore - 1))} className="bg-slate-800 px-2 rounded">-</button>
-                                            <span className="w-8 text-center text-emerald-400 font-bold">{m.awayScore}</span>
-                                            <button onClick={() => updateMatch(m.id, 'awayScore', m.awayScore + 1)} className="bg-slate-800 px-2 rounded">+</button>
-                                        </>
-                                    ) : (
-                                        <span className="text-xl font-bold">{m.awayScore}</span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="font-bold">{m.away}</span>
-                                    <span className="text-2xl">{COUNTRY_FLAGS[m.away] || '🏳️'}</span>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         );
