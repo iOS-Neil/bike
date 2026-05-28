@@ -99,7 +99,7 @@
         const handleAuth = async (e) => {
             e.preventDefault();
             try {
-                if (authView === 'login') await auth.signInWithEmailAndPassword(`${username}@wc.com`, password);
+                if (authView === 'login') await auth.signInWithEmailAndPassword(`${username}`, password);
                 else {
                     await auth.createUserWithEmailAndPassword(`${username}@wc.com`, password);
                     await db.ref(`artifacts/${appId}/public/data/users/${auth.currentUser.uid}`).set({ name: username });
