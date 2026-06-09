@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>SprocketSync GPS - Moto Dashboard</title>
+  <title>SprocketSync GPS - Moto Dashboard V2</title>
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,7 +17,7 @@
   
   <style>
     body {
-      background-color: #070a13;
+      background-color: #05070f;
       color: #e2e8f0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       user-select: none;
@@ -46,9 +46,24 @@
       border-radius: 50%;
       box-shadow: 0 0 8px rgba(0,0,0,0.5);
     }
+
+    /* Lean sweep gauge dynamic elements */
+    .lean-needle {
+      transition: transform 0.1s cubic-bezier(0.1, 0.8, 0.3, 1);
+    }
+    
+    /* Subtle alarm glow */
+    .speed-alarm-flash {
+      animation: alert-pulse 1s infinite alternate;
+    }
+    
+    @keyframes alert-pulse {
+      0% { border-color: rgba(220, 38, 38, 0.4); box-shadow: 0 0 8px rgba(220, 38, 38, 0.3); }
+      100% { border-color: rgba(220, 38, 38, 1); box-shadow: 0 0 24px rgba(220, 38, 38, 0.7); }
+    }
   </style>
 </head>
-<body class="h-[100dvh] w-screen flex flex-col overflow-hidden bg-[#070a13]">
+<body class="h-[100dvh] w-screen flex flex-col overflow-hidden bg-[#05070f]">
 
   <!-- Core Header -->
   <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 z-50">
@@ -57,8 +72,8 @@
         <i class="fa-solid fa-motorcycle text-slate-950"></i>
       </div>
       <div>
-        <h1 class="text-sm font-black tracking-wider text-slate-100">SPROCKETSYNC <span class="text-yellow-500">GPS</span></h1>
-        <p class="text-[10px] text-slate-400 font-semibold tracking-widest">CALIBRATOR & CO-PILOT</p>
+        <h1 class="text-sm font-black tracking-wider text-slate-100">SPROCKETSYNC <span class="text-yellow-500">V2</span></h1>
+        <p class="text-[10px] text-slate-400 font-semibold tracking-widest">TELEMETRY & GYROSCOPE</p>
       </div>
     </div>
     <div class="flex items-center gap-2">
@@ -72,6 +87,17 @@
     </div>
   </header>
 
+  <!-- Auto Recovery Alert Bar -->
+  <div id="recovery-bar" class="bg-gradient-to-r from-yellow-600 to-amber-700 text-slate-950 px-4 py-2.5 text-xs font-bold flex items-center justify-between gap-2 shrink-0 z-50 hidden">
+    <span class="flex items-center gap-2">
+      <i class="fa-solid fa-triangle-exclamation animate-bounce"></i> Unsaved active ride detected in memory!
+    </span>
+    <div class="flex gap-1.5">
+      <button onclick="recoverPreviousRide()" class="bg-slate-950 text-yellow-400 px-3 py-1 rounded text-[10px] font-black uppercase shadow">Restore</button>
+      <button onclick="discardPreviousRide()" class="bg-transparent border border-slate-950 text-slate-950 px-2 py-1 rounded text-[10px] font-black uppercase">Discard</button>
+    </div>
+  </div>
+
   <!-- Main Scrollable Section -->
   <main class="flex-1 overflow-y-auto relative">
 
@@ -84,30 +110,41 @@
           <span class="text-[10px] font-black tracking-wider text-emerald-400 uppercase flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span> Live Hardware Console
           </span>
-          <button id="btn-manual-gps-check" class="text-[9px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 hover:border-yellow-500 hover:text-yellow-500 font-bold text-slate-400 uppercase transition-all">
-            <i class="fa-solid fa-location-arrow"></i> Test GPS Lock
-          </button>
+          <div class="flex gap-1">
+            <button id="btn-request-imu" class="text-[9px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-cyan-400 font-bold uppercase transition-all">
+              <i class="fa-solid fa-mobile-screen-button"></i> Activate Gyro
+            </button>
+            <button id="btn-manual-gps-check" class="text-[9px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 hover:border-yellow-500 hover:text-yellow-500 font-bold text-slate-400 uppercase transition-all">
+              <i class="fa-solid fa-location-arrow"></i> Test GPS
+            </button>
+          </div>
         </div>
         <!-- Terminal event log outputs -->
-        <div id="diagnostic-terminal" class="font-mono text-[10px] text-slate-300 space-y-1 max-h-36 overflow-y-auto p-2 bg-[#04060b] rounded border border-slate-900">
-          <div class="text-slate-500">[SYSTEM] Application booting sequence initiated...</div>
-          <div class="text-slate-500">[SYSTEM] Map interface successfully loaded.</div>
-          <div class="text-yellow-500">[GPS] Awaiting hardware activation command...</div>
+        <div id="diagnostic-terminal" class="font-mono text-[10px] text-slate-300 space-y-1 max-h-24 overflow-y-auto p-2 bg-[#04060b] rounded border border-slate-900">
+          <div class="text-slate-500">[SYSTEM] SprocketSync V2 active...</div>
+          <div class="text-slate-500">[SYSTEM] System secure origin: HTTPS detected.</div>
+          <div class="text-yellow-500">[IMU] Gyroscope ready. Tap "Activate Gyro" to begin tracking lean angles...</div>
         </div>
       </div>
       
       <!-- Speedometer Gauge Card -->
-      <div class="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-6 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
-        <div class="absolute top-2 right-2 flex gap-1">
-          <button id="btn-toggle-unit" class="text-[10px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition">
+      <div id="speedometer-card" class="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-6 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
+        
+        <!-- Live RPM/Speed Bar graphic across the top -->
+        <div class="absolute top-0 left-0 right-0 h-1.5 bg-slate-800">
+          <div id="speed-indicator-bar" class="h-full bg-gradient-to-r from-emerald-500 via-yellow-500 to-rose-600 transition-all duration-300" style="width: 0%"></div>
+        </div>
+
+        <div class="absolute top-3 right-3 flex gap-1 z-10">
+          <button id="btn-toggle-unit" class="text-[10px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition shadow">
             UNIT: <span id="lbl-unit-setting">MPH</span>
           </button>
-          <button id="btn-audio-toggle" class="text-[10px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-green-400 font-bold transition flex items-center gap-1">
+          <button id="btn-audio-toggle" class="text-[10px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-green-400 font-bold transition shadow flex items-center gap-1">
             <i id="audio-icon" class="fa-solid fa-volume-high"></i> TTS
           </button>
         </div>
 
-        <span class="text-xs tracking-widest font-bold text-slate-400">CURRENT SPEED</span>
+        <span class="text-xs tracking-widest font-bold text-slate-400 mt-2">CURRENT SPEED</span>
         
         <!-- Big Digits Speed Display -->
         <div class="flex items-baseline my-3">
@@ -127,6 +164,70 @@
             <div class="text-lg font-bold text-yellow-600 font-mono"><span id="txt-calc-speedo">0</span> <span class="text-xs">mph</span></div>
           </div>
         </div>
+      </div>
+
+      <!-- NEW: Lean Angle IMU Sweep Meter -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-4 space-y-3 shadow-xl">
+        <div class="flex justify-between items-center border-b border-slate-800/60 pb-2">
+          <span class="text-xs font-black tracking-wider text-slate-300 uppercase flex items-center gap-2">
+            <i class="fa-solid fa-vector-square text-cyan-400"></i> Lean Angle Analytics
+          </span>
+          <button onclick="calibrateIMU()" class="text-[10px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition flex items-center gap-1.5 shadow">
+            <i class="fa-solid fa-arrows-to-eye"></i> Calibrate Zero
+          </button>
+        </div>
+
+        <!-- Lean sweep slider gauge visualizer -->
+        <div class="relative py-4 flex flex-col items-center">
+          <div class="w-full h-2 bg-slate-950 rounded-full relative overflow-visible border border-slate-800">
+            <!-- Left limits -->
+            <div class="absolute left-1/4 top-0 bottom-0 w-[2px] bg-rose-500/40"></div>
+            <!-- Right limits -->
+            <div class="absolute right-1/4 top-0 bottom-0 w-[2px] bg-rose-500/40"></div>
+            <!-- Dynamic Left Peak line -->
+            <div id="lean-left-peak" class="absolute h-4 w-[2px] bg-yellow-500 -top-1" style="left: 50%;"></div>
+            <!-- Dynamic Right Peak line -->
+            <div id="lean-right-peak" class="absolute h-4 w-[2px] bg-yellow-500 -top-1" style="left: 50%;"></div>
+            <!-- Center line -->
+            <div class="absolute left-1/2 top-0 bottom-0 w-[2px] bg-slate-500"></div>
+            <!-- Active needle marker -->
+            <div id="lean-active-needle" class="absolute h-6 w-1 bg-cyan-400 rounded-full -top-2 left-1/2 transform -translate-x-1/2 lean-needle"></div>
+          </div>
+
+          <!-- Dynamic sweep numbers -->
+          <div class="w-full flex justify-between text-[10px] text-slate-500 mt-2 font-mono">
+            <span>45° LEFT</span>
+            <span>0° CENTER</span>
+            <span>45° RIGHT</span>
+          </div>
+        </div>
+
+        <!-- Stats columns -->
+        <div class="grid grid-cols-3 gap-2 text-center pt-2 border-t border-slate-800/60">
+          <div>
+            <div class="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Peak Left</div>
+            <div class="text-xl font-black text-rose-400 font-mono"><span id="txt-peak-left">0</span>°</div>
+          </div>
+          <div>
+            <div class="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Current</div>
+            <div class="text-2xl font-black text-cyan-400 font-mono"><span id="txt-current-lean">0</span>°</div>
+          </div>
+          <div>
+            <div class="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Peak Right</div>
+            <div class="text-xl font-black text-rose-400 font-mono"><span id="txt-peak-right">0</span>°</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Speed Alert Guard config -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-[10px] text-slate-400 font-black uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-bell text-rose-500"></i> Speed Alert Notification
+          </label>
+          <span class="text-xs font-mono font-bold text-rose-500"><span id="txt-alert-val">70</span> <span class="text-[10px]">mph</span></span>
+        </div>
+        <input type="range" id="alert-speed-range" min="30" max="120" value="70" class="w-full accent-yellow-500 h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer">
       </div>
 
       <!-- Live Statistics Grid -->
@@ -190,7 +291,7 @@
       <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-xs font-black tracking-wide text-slate-300 uppercase flex items-center gap-2">
-            <i class="fa-solid fa-laptop-code text-cyan-400"></i> Local Desk Simulation
+            <i class="fa-solid fa-laptop-code text-cyan-400"></i> Couch Ride Simulator
           </h3>
           <label class="relative inline-flex items-center cursor-pointer">
             <input type="checkbox" id="sim-toggle-switch" class="sr-only peer">
@@ -198,17 +299,26 @@
           </label>
         </div>
         <p class="text-[11px] text-slate-400 leading-relaxed">
-          Switch this on to run an immediate virtual test cruise from Gosport along the A32. This bypasses real-world GPS permission requests so you can verify features instantly!
+          Switch this on to run an immediate virtual test cruise from Gosport along the A32. This includes simulated bank tilts and milestone completions!
         </p>
       </div>
 
-      <!-- Map Display Area -->
+      <!-- Map Display Area with Controls -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div class="p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
+        <div class="p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center flex-wrap gap-2">
           <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-            <i class="fa-solid fa-map-location-dot text-yellow-500"></i> LIVE TRACK ROUTE
+            <i class="fa-solid fa-map-location-dot text-yellow-500"></i> LIVE ROUTE MAP
           </span>
-          <span class="text-[10px] text-slate-400 font-bold">Tap mile markers for logged speed</span>
+          <div class="flex gap-1.5 items-center">
+            <!-- Map centering toggle -->
+            <button id="btn-toggle-center" onclick="toggleMapCenterLock()" class="text-[9px] px-2 py-1 rounded bg-yellow-500 text-slate-950 font-black uppercase shadow">
+              <i class="fa-solid fa-lock"></i> Auto-Center
+            </button>
+            <!-- Map theme layer toggle -->
+            <button id="btn-toggle-theme" onclick="toggleMapTheme()" class="text-[9px] px-2 py-1 rounded bg-slate-800 text-slate-300 font-bold uppercase">
+              Dark Map
+            </button>
+          </div>
         </div>
         <div id="map-canvas" class="h-80 w-full bg-slate-950"></div>
       </div>
@@ -219,11 +329,27 @@
     <section id="tab-calibrator" class="p-4 space-y-4 max-w-xl mx-auto hidden">
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
         <h2 class="text-base font-black text-slate-200 mb-1 tracking-wide uppercase flex items-center gap-2">
-          <i class="fa-solid fa-gears text-yellow-500"></i> Sprocket Speedometer Calibration
+          <i class="fa-solid fa-gears text-yellow-500"></i> Sprocket Calibration
         </h2>
         <p class="text-xs text-slate-400 leading-relaxed">
-          Changing sprockets alters final drive ratios. Since motorcycle speedometers measure shaft output speed, gearing changes throw speed calculations off.
+          Gearing modifications throw off speedometers. Save configuration profiles to translate drive shaft speed accurately.
         </p>
+      </div>
+
+      <!-- Preset selector -->
+      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-2">
+        <span class="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Gearing Profiles / Presets</span>
+        <div class="grid grid-cols-3 gap-1.5">
+          <button onclick="applyGearingPreset(15, 45, 14, 47, 'Aggressive Gearing')" class="py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded text-[10px] font-bold border border-slate-800">
+            -1 Front / +2 Rear
+          </button>
+          <button onclick="applyGearingPreset(15, 45, 14, 45, 'Short Spurt')" class="py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded text-[10px] font-bold border border-slate-800">
+            -1 Front (Speedy)
+          </button>
+          <button onclick="applyGearingPreset(15, 45, 15, 45, 'Default Gearing')" class="py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded text-[10px] font-bold border border-slate-800">
+            Reset Gearing
+          </button>
+        </div>
       </div>
 
       <div class="grid grid-cols-2 gap-2 border-b border-slate-800 pb-2">
@@ -359,6 +485,7 @@
 
   <!-- Script logics -->
   <script>
+    // Global State Management
     const state = {
       isTracking: false,
       isSimulating: false,
@@ -373,6 +500,16 @@
       pointsList: [], 
       milestones: [], 
       
+      // IMU / Gyroscope state
+      imu: {
+        rawLean: 0,
+        calibratedOffset: 0,
+        peakLeft: 0,
+        peakRight: 0,
+        posture: 'portrait' // handles dynamic posture correction
+      },
+      
+      // Calibration config
       calibMode: 'sprocket', 
       sprocket: {
         origFront: 15,
@@ -386,37 +523,45 @@
       },
       calibFactor: 1.0,
 
+      speedAlertVal: 70,
+
+      // UI Configs
+      mapCenterLocked: true,
+      mapTheme: 'dark',
+
       ttsEnabled: true,
       lastAnnouncedMilestone: 0,
       wakeLock: null
     };
 
     const simulationPath = [
-      { lat: 50.7941, lng: -1.1243, speed: 25 }, 
-      { lat: 50.8010, lng: -1.1290, speed: 32 },
-      { lat: 50.8250, lng: -1.1400, speed: 45 },
-      { lat: 50.8450, lng: -1.1620, speed: 50 }, 
-      { lat: 50.8650, lng: -1.1710, speed: 30 }, 
-      { lat: 50.8850, lng: -1.1820, speed: 55 }, 
-      { lat: 50.9020, lng: -1.1850, speed: 64 }, 
-      { lat: 50.9210, lng: -1.1650, speed: 71 }, 
-      { lat: 50.9380, lng: -1.1510, speed: 74 }, 
-      { lat: 50.9520, lng: -1.1420, speed: 68 }, 
-      { lat: 50.9650, lng: -1.1350, speed: 40 }, 
-      { lat: 50.9850, lng: -1.1190, speed: 58 },
-      { lat: 51.0120, lng: -1.0980, speed: 62 }, 
-      { lat: 51.0320, lng: -1.0850, speed: 35 }  
+      { lat: 50.7941, lng: -1.1243, speed: 25, lean: -5 }, 
+      { lat: 50.8010, lng: -1.1290, speed: 32, lean: -12 },
+      { lat: 50.8250, lng: -1.1400, speed: 45, lean: 18 },
+      { lat: 50.8450, lng: -1.1620, speed: 50, lean: 2 }, 
+      { lat: 50.8650, lng: -1.1710, speed: 30, lean: -22 }, 
+      { lat: 50.8850, lng: -1.1820, speed: 55, lean: -15 }, 
+      { lat: 50.9020, lng: -1.1850, speed: 64, lean: 28 }, 
+      { lat: 50.9210, lng: -1.1650, speed: 71, lean: 5 }, 
+      { lat: 50.9380, lng: -1.1510, speed: 74, lean: -8 }, 
+      { lat: 50.9520, lng: -1.1420, speed: 68, lean: -25 }, 
+      { lat: 50.9650, lng: -1.1350, speed: 40, lean: 12 }, 
+      { lat: 50.9850, lng: -1.1190, speed: 58, lean: 15 },
+      { lat: 51.0120, lng: -1.0980, speed: 62, lean: -10 }, 
+      { lat: 51.0320, lng: -1.0850, speed: 35, lean: 0 }  
     ];
     let simIndex = 0;
     let simTimerId = null;
 
-    const APP_STORAGE_KEY = 'sprocketsync_rides_v1';
+    const APP_STORAGE_KEY = 'sprocketsync_rides_v2';
+    const AUTO_SAVE_KEY = 'sprocketsync_autosave_v2';
 
     let map = null;
     let pathPolyline = null;
     let liveMarker = null;
     let mapMarkersList = [];
     let watchId = null;
+    let tileLayer = null;
 
     function addLog(text, color = 'text-slate-300') {
       const terminal = document.getElementById('diagnostic-terminal');
@@ -435,9 +580,9 @@
       if ('wakeLock' in navigator) {
         try {
           state.wakeLock = await navigator.wakeLock.request('screen');
-          addLog("Wake Lock API active. Screen dimming disabled.", "text-emerald-400");
+          addLog("Wake Lock active. Smartphone display locked ON.", "text-emerald-400");
         } catch (err) {
-          addLog("Wake Lock API unsupported on this browser.", "text-slate-500");
+          addLog("Wake Lock unsupported on this client.", "text-slate-550");
         }
       }
     }
@@ -470,11 +615,124 @@
           window.speechSynthesis.cancel(); 
           const utterance = new SpeechSynthesisUtterance(text);
           utterance.rate = 1.0;
-          utterance.volume = 1.0;
+          utterance.volume = 0.85;
           window.speechSynthesis.speak(utterance);
         } catch (err) {
           console.warn("TTS blocked.");
         }
+      }
+    }
+
+    // Dynamic lean estimation from standard mobile sensors
+    function handleOrientation(event) {
+      let relativeRoll = 0;
+      
+      // Determine orientation of landscape/portrait layout
+      if (window.innerHeight > window.innerWidth) {
+        // Portrait mount
+        relativeRoll = event.gamma || 0; // Roll degree
+        state.imu.posture = 'portrait';
+      } else {
+        // Landscape mount
+        relativeRoll = event.beta || 0; // Pitch takes over roll on rotation
+        state.imu.posture = 'landscape';
+      }
+
+      // Apply saved handlebars baseline calibration offset
+      let finalLean = relativeRoll - state.imu.calibratedOffset;
+
+      // Handle raw roll boundaries over 180 degrees
+      if (finalLean > 90) finalLean = 180 - finalLean;
+      if (finalLean < -90) finalLean = -180 - finalLean;
+
+      state.imu.rawLean = finalLean;
+      updateLeanGaugeUI();
+    }
+
+    function updateLeanGaugeUI() {
+      const lean = state.imu.rawLean;
+      const absLean = Math.abs(Math.round(lean));
+
+      // Calculate new peaks
+      if (lean < 0 && lean < state.imu.peakLeft) {
+        state.imu.peakLeft = lean;
+      } else if (lean > 0 && lean > state.imu.peakRight) {
+        state.imu.peakRight = lean;
+      }
+
+      const leftText = document.getElementById('txt-peak-left');
+      const rightText = document.getElementById('txt-peak-right');
+      const curText = document.getElementById('txt-current-lean');
+      const activeNeedle = document.getElementById('lean-active-needle');
+
+      if (leftText) leftText.textContent = Math.abs(Math.round(state.imu.peakLeft));
+      if (rightText) rightText.textContent = Math.round(state.imu.peakRight);
+      if (curText) curText.textContent = absLean;
+
+      // Update visually sliders
+      if (activeNeedle) {
+        // Map lean angle (-45 to 45) to slider width percents (0% to 100%)
+        let needlePercentage = 50 + (lean * 1.11); // scale visual sweep nicely
+        if (needlePercentage < 2) needlePercentage = 2;
+        if (needlePercentage > 98) needlePercentage = 98;
+        activeNeedle.style.left = `${needlePercentage}%`;
+      }
+
+      // Update Peak lines relative locations
+      const leftLine = document.getElementById('lean-left-peak');
+      const rightLine = document.getElementById('lean-right-peak');
+      if (leftLine) {
+        let leftPercent = 50 + (state.imu.peakLeft * 1.11);
+        leftLine.style.left = `${Math.max(2, leftPercent)}%`;
+      }
+      if (rightLine) {
+        let rightPercent = 50 + (state.imu.peakRight * 1.11);
+        rightLine.style.left = `${Math.min(98, rightPercent)}%`;
+      }
+
+      // Voice warn if they lean incredibly deep (safety alert)
+      if (absLean > 42 && state.isTracking && Date.now() % 5000 < 100) {
+        announceWithVoice("Alert. Deep lean limit reached.");
+      }
+    }
+
+    function calibrateIMU() {
+      // Capture current physical angle as zero
+      let baseVal = 0;
+      if (window.innerHeight > window.innerWidth) {
+        baseVal = state.imu.rawLean + state.imu.calibratedOffset; // Portrait raw
+      } else {
+        baseVal = state.imu.rawLean + state.imu.calibratedOffset; // Landscape raw
+      }
+      
+      state.imu.calibratedOffset = baseVal;
+      state.imu.peakLeft = 0;
+      state.imu.peakRight = 0;
+      
+      addLog(`IMU calibrated. Dashboard zero established at ${baseVal.toFixed(1)}° inclination.`, "text-cyan-400 font-bold");
+      showToast("Gearing & Gyro Centered.");
+    }
+
+    async function requestIMUAccess() {
+      addLog("Querying orientation hardware lock...", "text-yellow-500");
+      
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const permissionState = await DeviceOrientationEvent.requestPermission();
+          if (permissionState === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation);
+            addLog("IMU integration unlocked. High-precision lean tracking active!", "text-emerald-400 font-bold");
+            showToast("Gyro Scope Unlocked!");
+          } else {
+            addLog("IMU hardware access denied by mobile user.", "text-rose-500");
+          }
+        } catch (err) {
+          addLog(`iOS Sandbox blocked raw IMU calls: ${err.message}`, "text-slate-500");
+        }
+      } else {
+        // Fallback for non-iOS or desktop simulations
+        window.addEventListener('deviceorientation', handleOrientation);
+        addLog("Standard orientation listener active.", "text-cyan-400");
       }
     }
 
@@ -496,14 +754,14 @@
     function initMap() {
       try {
         if (typeof L === 'undefined') {
-          addLog("Warning: Leaflet map library failed to load. Operating in map-less dashboard mode.", "text-yellow-500");
+          addLog("Warning: Leaflet maps crashed. Cockpit running in map-less telemetry style.", "text-yellow-500");
           const container = document.getElementById('map-canvas');
           if (container) {
             container.innerHTML = `
               <div class="h-full w-full flex flex-col items-center justify-center text-slate-500 p-4 text-center bg-slate-950">
                 <i class="fa-solid fa-triangle-exclamation text-3xl text-yellow-500 mb-2"></i>
                 <p class="text-xs font-bold text-slate-400">Map Interface Offline</p>
-                <p class="text-[10px] text-slate-600 mt-1">Browser security blocks or network is down. The speedometer still remains 100% active.</p>
+                <p class="text-[10px] text-slate-600 mt-1">Telemetry and diagnostics dashboard remains 100% functional.</p>
               </div>
             `;
           }
@@ -516,9 +774,7 @@
           attributionControl: false
         }).setView(defaultCenter, 13);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          maxZoom: 20
-        }).addTo(map);
+        updateMapThemeLayer();
 
         pathPolyline = L.polyline([], {
           color: '#22d3ee', 
@@ -538,7 +794,36 @@
 
         liveMarker = L.marker(defaultCenter, { icon: liveIcon }).addTo(map);
       } catch (err) {
-        addLog(`Map initialization failed gracefully: ${err.message}`, "text-slate-500");
+        addLog(`Map instantiation skipped: ${err.message}`, "text-slate-550");
+      }
+    }
+
+    function updateMapThemeLayer() {
+      if (!map) return;
+      if (tileLayer) map.removeLayer(tileLayer);
+
+      const url = state.mapTheme === 'dark' 
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+      tileLayer = L.tileLayer(url, { maxZoom: 20 }).addTo(map);
+    }
+
+    function toggleMapTheme() {
+      state.mapTheme = state.mapTheme === 'dark' ? 'light' : 'dark';
+      document.getElementById('btn-toggle-theme').textContent = state.mapTheme === 'dark' ? 'Dark Map' : 'Standard Map';
+      updateMapThemeLayer();
+    }
+
+    function toggleMapCenterLock() {
+      state.mapCenterLocked = !state.mapCenterLocked;
+      const btn = document.getElementById('btn-toggle-center');
+      if (state.mapCenterLocked) {
+        btn.className = "text-[9px] px-2 py-1 rounded bg-yellow-500 text-slate-950 font-black uppercase shadow";
+        btn.innerHTML = `<i class="fa-solid fa-lock"></i> Auto-Center`;
+      } else {
+        btn.className = "text-[9px] px-2 py-1 rounded bg-slate-800 text-slate-400 font-bold uppercase";
+        btn.innerHTML = `<i class="fa-solid fa-unlock"></i> Manual Map`;
       }
     }
 
@@ -549,9 +834,11 @@
         pathPolyline.setLatLngs(latLngs);
         const lastPoint = latLngs[latLngs.length - 1];
         if (liveMarker) liveMarker.setLatLng(lastPoint);
-        map.panTo(lastPoint);
+        if (state.mapCenterLocked) {
+          map.panTo(lastPoint);
+        }
       } catch (e) {
-        console.warn("Map coordinates redraw error suppressed.");
+        console.warn("Map refresh skipped.");
       }
     }
 
@@ -578,7 +865,7 @@
         const countText = document.getElementById('txt-milestones-count');
         if (countText) countText.textContent = state.milestones.length;
 
-        addLog(`Milestone ${currentMilestoneIndex} reached at ${Math.round(state.currentSpeed)} mph!`, "text-yellow-400 font-bold");
+        addLog(`Milestone ${currentMilestoneIndex} completed at ${Math.round(state.currentSpeed)} mph!`, "text-yellow-400 font-bold");
 
         if (map) {
           try {
@@ -654,8 +941,23 @@
 
         buildConversionCheatSheet();
       } catch (err) {
-        console.warn("Calibration calculation math errored.");
+        console.warn("Calibration calculations mathematical overflow.");
       }
+    }
+
+    function applyGearingPreset(of, or, nf, nr, presetName) {
+      document.getElementById('input-orig-front').value = of;
+      document.getElementById('input-orig-rear').value = or;
+      document.getElementById('input-new-front').value = nf;
+      document.getElementById('input-new-rear').value = nr;
+      
+      state.calibMode = 'sprocket';
+      document.getElementById('panel-sprocket-math').classList.remove('hidden');
+      document.getElementById('panel-gps-math').classList.add('hidden');
+      
+      updateSprocketCalibration();
+      addLog(`Preset profile '${presetName}' loaded successfully.`, "text-cyan-400 font-bold");
+      showToast(`${presetName} Active`);
     }
 
     function buildConversionCheatSheet() {
@@ -696,8 +998,20 @@
           ? state.distance * 0.000621371 
           : state.distance * 0.001; 
         document.getElementById('txt-distance').textContent = distanceDisplay.toFixed(2);
+
+        // Dynamically size progress indicator bar (0 - 100 mph bounds)
+        const indicatorWidth = Math.min(100, Math.max(0, (displaySpeed / 100) * 100));
+        document.getElementById('speed-indicator-bar').style.width = `${indicatorWidth}%`;
+
+        // Check speed threshold limit alerting
+        const speedometerCard = document.getElementById('speedometer-card');
+        if (displaySpeed >= state.speedAlertVal) {
+          speedometerCard.classList.add('speed-alarm-flash');
+        } else {
+          speedometerCard.classList.remove('speed-alarm-flash');
+        }
       } catch (err) {
-        console.warn("Cockpit UI draw skipped.");
+        console.warn("Dashboard drawing frame interrupted.");
       }
     }
 
@@ -712,6 +1026,89 @@
       state.elapsedTime++;
       const durationEl = document.getElementById('txt-duration');
       if (durationEl) durationEl.textContent = formatTime(state.elapsedTime);
+
+      // Perform a safety background checkpoint write every 10 seconds
+      if (state.elapsedTime % 10 === 0) {
+        saveActiveStateToMemory();
+      }
+    }
+
+    // Auto-Recovery mechanics
+    function saveActiveStateToMemory() {
+      if (!state.isTracking) return;
+      
+      const autosaveData = {
+        startTime: state.startTime,
+        elapsedTime: state.elapsedTime,
+        distance: state.distance,
+        topSpeed: state.topSpeed,
+        pointsList: state.pointsList,
+        milestones: state.milestones,
+        unit: state.unit,
+        imu: state.imu
+      };
+      
+      localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(autosaveData));
+    }
+
+    function checkPreviousRideRecovery() {
+      const stored = localStorage.getItem(AUTO_SAVE_KEY);
+      if (stored) {
+        document.getElementById('recovery-bar').classList.remove('hidden');
+      }
+    }
+
+    function recoverPreviousRide() {
+      try {
+        const stored = localStorage.getItem(AUTO_SAVE_KEY);
+        if (!stored) return;
+
+        const data = JSON.parse(stored);
+        
+        state.isTracking = true;
+        state.startTime = data.startTime;
+        state.elapsedTime = data.elapsedTime;
+        state.distance = data.distance;
+        state.topSpeed = data.topSpeed;
+        state.pointsList = data.pointsList || [];
+        state.milestones = data.milestones || [];
+        state.unit = data.unit || 'mph';
+        state.imu = data.imu || state.imu;
+
+        document.getElementById('txt-milestones-count').textContent = state.milestones.length;
+        document.getElementById('txt-duration').textContent = formatTime(state.elapsedTime);
+
+        addLog("Auto-Recovery completed! Ride session telemetry restored safely.", "text-emerald-400 font-bold");
+        
+        // Redraw historical map coordinates
+        if (map && state.pointsList.length > 0) {
+          updateMapPoints();
+        }
+
+        // Re-establish tracking parameters
+        state.intervalId = setInterval(runTimer, 1000);
+        
+        if (state.isSimulating) {
+          startSimulation();
+        } else {
+          startRealGPS();
+        }
+
+        document.getElementById('btn-start-ride').classList.add('hidden');
+        document.getElementById('btn-stop-ride').classList.remove('hidden');
+
+        document.getElementById('recovery-bar').classList.add('hidden');
+        showToast("Ride Restored Successfully!");
+      } catch (err) {
+        addLog(`Recovery Error: ${err.message}`, "text-rose-500");
+        discardPreviousRide();
+      }
+    }
+
+    function discardPreviousRide() {
+      localStorage.removeItem(AUTO_SAVE_KEY);
+      document.getElementById('recovery-bar').classList.add('hidden');
+      addLog("Previous incomplete ride discarded.", "text-slate-500");
     }
 
     function updateGPSBadgeStatus(customStatus = "") {
@@ -856,7 +1253,7 @@
       updateGPSBadgeStatus("OFF");
     }
 
-    // SIMULATION ENGINE
+    // SIMULATION ENGINE WITH LEAN ANGLE INTERPOLATOR
     function runSimulatedStep() {
       if (!state.isSimulating) return;
 
@@ -873,6 +1270,12 @@
         const currentLat = startPos.lat + (endPos.lat - startPos.lat) * fraction;
         const currentLng = startPos.lng + (endPos.lng - startPos.lng) * fraction;
         const currentSpeed = startPos.speed + (endPos.speed - startPos.speed) * fraction;
+        
+        // Also simulate physical lean angles on corner entries
+        const startLean = startPos.lean || 0;
+        const endLean = endPos.lean || 0;
+        state.imu.rawLean = startLean + (endLean - startLean) * fraction;
+        updateLeanGaugeUI();
 
         const simulatedCoords = {
           coords: {
@@ -933,6 +1336,10 @@
           state.milestones = [];
           state.lastPosition = null;
 
+          // Clear peaks
+          state.imu.peakLeft = 0;
+          state.imu.peakRight = 0;
+
           addLog("New ride logging initiated. Awaiting GPS packets...", "text-yellow-400");
 
           if (map) {
@@ -953,6 +1360,9 @@
           updateCockpitUI();
           requestWakeLock();
           announceWithVoice("Starting ride tracker.");
+
+          // Request Orientation permission automatically when ride starts
+          requestIMUAccess();
 
           state.intervalId = setInterval(runTimer, 1000);
 
@@ -982,7 +1392,11 @@
           }
 
           releaseWakeLock();
-          addLog(`Ride tracking finalized. Total distance run: ${ (state.distance * 0.000621371).toFixed(2) } mi. Top speed: ${state.topSpeed.toFixed(1)} mph.`, "text-emerald-400 font-bold");
+          
+          // Clear active auto-save record on successful completion
+          localStorage.removeItem(AUTO_SAVE_KEY);
+
+          addLog(`Ride tracking finalized. Total distance run: ${ (state.distance * 0.000621371).toFixed(2) } mi. Top speed: ${state.topSpeed.toFixed(1)} mph. Max Left Lean: ${Math.abs(Math.round(state.imu.peakLeft))}° | Max Right Lean: ${Math.round(state.imu.peakRight)}°`, "text-emerald-400 font-bold");
           announceWithVoice(`Ride completed. Distance calculated was ${ (state.distance * 0.000621371).toFixed(1) } miles.`);
 
           const btnStart = document.getElementById('btn-start-ride');
@@ -1007,7 +1421,11 @@
         duration: state.elapsedTime,
         milestonesCount: state.milestones.length,
         milestones: state.milestones,
-        path: state.pointsList 
+        path: state.pointsList,
+        peaks: {
+          left: state.imu.peakLeft,
+          right: state.imu.peakRight
+        }
       };
 
       let savedRides = [];
@@ -1076,8 +1494,20 @@
             </div>
           </div>
 
+          <!-- Dynamic Peak leans storage -->
+          <div class="grid grid-cols-2 gap-2 text-center bg-slate-950/40 py-1.5 rounded-lg border border-slate-800/40">
+            <div>
+              <span class="text-[8px] text-slate-500 font-bold uppercase block">Max Left Lean</span>
+              <span class="text-xs font-black text-rose-400 font-mono">${Math.abs(Math.round(ride.peaks?.left || 0))}°</span>
+            </div>
+            <div>
+              <span class="text-[8px] text-slate-500 font-bold uppercase block">Max Right Lean</span>
+              <span class="text-xs font-black text-rose-400 font-mono">${Math.round(ride.peaks?.right || 0)}°</span>
+            </div>
+          </div>
+
           ${ride.milestones && ride.milestones.length > 0 ? `
-            <div class="bg-slate-950/60 rounded-lg p-2.5 mt-2">
+            <div class="bg-slate-950/60 rounded-lg p-2.5">
               <span class="text-[10px] font-black text-slate-400 block mb-1 uppercase tracking-wider">
                 <i class="fa-solid fa-circle-info text-yellow-500"></i> Milestone Speeds:
               </span>
@@ -1301,8 +1731,26 @@
       updateSprocketCalibration();
       buildHistoryList();
 
-      // Run diagnostics instantly so the user knows exactly why their device behaves the way it does
+      // Check if there is an unsaved ride session to restore
+      checkPreviousRideRecovery();
+
+      // Run diagnostics instantly
       runContextDiagnostic();
+
+      // Bind gyroscope hardware trigger button
+      const btnIMU = document.getElementById('btn-request-imu');
+      if (btnIMU) {
+        btnIMU.onclick = requestIMUAccess;
+      }
+
+      // Bind speed threshold slider
+      const speedRange = document.getElementById('alert-speed-range');
+      if (speedRange) {
+        speedRange.oninput = function() {
+          state.speedAlertVal = parseInt(this.value);
+          document.getElementById('txt-alert-val').textContent = state.speedAlertVal;
+        }
+      }
 
       try {
         const inputsToWatch = [
