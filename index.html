@@ -1,185 +1,1414 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WC2026 Predictor Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; }
-        .glass-card { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.4); }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
-    <script type="text/babel">
-    const firebaseConfig = {
-        apiKey: "AIzaSyC2Sr5IcLU9p2HopvBvOFlsBRGZtB1y9NE",
-        authDomain: "pcc2026wc.firebaseapp.com",
-        databaseURL: "https://pcc2026wc-default-rtdb.europe-west1.firebasedatabase.app",
-        projectId: "pcc2026wc",
-        storageBucket: "pcc2026wc.firebasestorage.app",
-        messagingSenderId: "435446315061",
-        appId: "1:435446315061:web:ab2b76edfb08e8ee6b997c"
-    };
-
-    // PASTE YOUR UID HERE:
-    const ADMIN_UID = "mJFQl94QpgMzbfi07u2EStaxDJZ2"; 
-    const appId = "my-world-cup-predictor-2026";
-
-    const COUNTRY_FLAGS = {
-        "Mexico": "🇲🇽", "South Africa": "🇿🇦", "South Korea": "🇰🇷", "Czech Republic": "🇨🇿",
-        "Canada": "🇨🇦", "Bosnia": "🇧🇦", "Qatar": "🇶🇦", "Switzerland": "🇨🇭",
-        "Brazil": "🇧🇷", "Morocco": "🇲🇦", "Haiti": "🇭🇹", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
-        "USA": "🇺🇸", "Paraguay": "🇵🇾", "Australia": "🇦🇺", "Turkey": "🇹🇷",
-        "Germany": "🇩🇪", "Curaçao": "🇨🇼", "Ivory Coast": "🇨🇮", "Ecuador": "🇪🇨",
-        "Netherlands": "🇳🇱", "Japan": "🇯🇵", "Sweden": "🇸🇪", "Tunisia": "🇹🇳",
-        "Belgium": "🇧🇪", "Egypt": "🇪🇬", "Iran": "🇮🇷", "New Zealand": "🇳🇿",
-        "Spain": "🇪🇸", "Cape Verde": "🇨🇻", "Saudi Arabia": "🇸🇦", "Uruguay": "🇺🇾"
-    };
-
-    const GROUPS_TEAMS = {
-        A: ["Mexico", "South Africa", "South Korea", "Czech Republic"],
-        B: ["Canada", "Bosnia", "Qatar", "Switzerland"],
-        C: ["Brazil", "Morocco", "Haiti", "Scotland"],
-        D: ["USA", "Paraguay", "Australia", "Turkey"],
-        E: ["Germany", "Curaçao", "Ivory Coast", "Ecuador"],
-        F: ["Netherlands", "Japan", "Sweden", "Tunisia"],
-        G: ["Belgium", "Egypt", "Iran", "New Zealand"],
-        H: ["Spain", "Cape Verde", "Saudi Arabia", "Uruguay"]
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.database();
-
-    function App() {
-        const [user, setUser] = React.useState(null);
-        const [authLoading, setAuthLoading] = React.useState(true);
-        const [authView, setAuthView] = React.useState('login');
-        const [email, setEmail] = React.useState('');
-        const [password, setPassword] = React.useState('');
-        const [matches, setMatches] = React.useState([]);
-        const [predictions, setPredictions] = React.useState({});
-        const [adminMode, setAdminMode] = React.useState(false);
-        const [activeGroup, setActiveGroup] = React.useState('A');
-
-        React.useEffect(() => {
-            auth.onAuthStateChanged(u => { setUser(u); setAuthLoading(false); });
-            db.ref(`artifacts/${appId}/public/data/matches`).on('value', snap => setMatches(Object.values(snap.val() || {})));
-            db.ref(`artifacts/${appId}/public/data/predictions`).on('value', snap => setPredictions(snap.val() || {}));
-        }, []);
-
-        const seedMatches = () => {
-            const matches = {};
-            Object.keys(GROUPS_TEAMS).forEach(g => {
-                const teams = GROUPS_TEAMS[g];
-                const groupMatches = [
-                    { home: teams[0], away: teams[1], date: "June 11" },
-                    { home: teams[2], away: teams[3], date: "June 14" }, 
-                    { home: teams[0], away: teams[2], date: "June 15" },
-                    { home: teams[1], away: teams[3], date: "June 16" },
-                    { home: teams[3], away: teams[0], date: "June 20" },
-                    { home: teams[1], away: teams[2], date: "June 21" }
-                ];
-                groupMatches.forEach((m, i) => matches[`g_${g}_${i}`] = { ...m, id: `g_${g}_${i}`, group: g, homeScore: 0, awayScore: 0, completed: false });
-            });
-            db.ref(`artifacts/${appId}/public/data/matches`).set(matches);
-        };
-
-        const updateMatch = (id, field, val) => db.ref(`artifacts/${appId}/public/data/matches/${id}`).update({ [field]: val });
-        const updatePrediction = (matchId, field, val) => {
-            const predId = `${user.uid}_${matchId}`;
-            const current = predictions[predId] || { home: 0, away: 0 };
-            db.ref(`artifacts/${appId}/public/data/predictions/${predId}`).set({ ...current, [field]: val });
-        };
-
-        const handleAuth = async (e) => {
-            e.preventDefault();
-            try {
-                if (authView === 'login') await auth.signInWithEmailAndPassword(email, password);
-                else await auth.createUserWithEmailAndPassword(email, password);
-            } catch (err) { alert(err.message); }
-        };
-
-        if (authLoading) return <div className="p-4">Loading...</div>;
-        if (!user) return (
-            <div className="max-w-md mx-auto p-10 glass-card rounded-3xl mt-20">
-                <h2 className="text-2xl font-black mb-6 text-emerald-400">{authView === 'login' ? 'LOGIN' : 'REGISTER'}</h2>
-                <form onSubmit={handleAuth} className="space-y-4">
-                    <input className="w-full bg-slate-800 p-3 rounded-xl" placeholder="Email" onChange={e => setEmail(e.target.value)} />
-                    <input className="w-full bg-slate-800 p-3 rounded-xl" type="password" placeholder="Password" onChange={e => setPassword(e.target.value)} />
-                    <button className="w-full bg-emerald-500 p-3 rounded-xl font-bold">SUBMIT</button>
-                </form>
-                <p className="mt-4 text-xs text-slate-500 cursor-pointer underline" onClick={() => setAuthView(authView === 'login' ? 'reg' : 'login')}>Toggle Login/Register</p>
-            </div>
-        );
-
-        return (
-            <div className="max-w-4xl mx-auto p-4">
-                <header className="flex justify-between items-center glass-card p-6 rounded-3xl mb-6">
-                    <div>
-                        <h1 className="font-black text-emerald-400">WC PREDICTOR 2026</h1>
-                        <p className="text-[10px] text-slate-500">YOUR UID: {user.uid}</p>
-                    </div>
-                    <div className="flex gap-4">
-                        {user?.uid === ADMIN_UID && <button onClick={() => setAdminMode(!adminMode)} className="bg-amber-500 text-black px-4 py-2 rounded-xl font-bold">⚙️</button>}
-                        <button onClick={() => auth.signOut()} className="text-sm font-bold">Logout</button>
-                    </div>
-                </header>
-
-                {adminMode && (
-                    <div className="glass-card p-6 mb-6 rounded-3xl space-y-4">
-                        <button onClick={seedMatches} className="bg-red-500 text-white px-4 py-2 rounded-xl text-sm w-full font-bold">Reset All Matches (Use after code update)</button>
-                    </div>
-                )}
-
-                <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                    {Object.keys(GROUPS_TEAMS).map(g => (
-                        <button key={g} onClick={() => setActiveGroup(g)} className={`px-4 py-2 rounded-xl font-bold text-sm whitespace-nowrap ${activeGroup === g ? 'bg-emerald-500 text-black' : 'bg-slate-800'}`}>Group {g}</button>
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {matches.filter(m => m.group === activeGroup).map(m => {
-                        const pred = predictions[`${user.uid}_${m.id}`] || { home: 0, away: 0 };
-                        return (
-                            <div key={m.id} className="glass-card p-4 rounded-2xl">
-                                <p className="text-xs font-bold text-slate-400 mb-4">{m.date} - Group {m.group}</p>
-                                <div className="flex justify-between items-center mb-4">
-                                    <div className="flex items-center gap-2"><span className="text-2xl">{COUNTRY_FLAGS[m.home]}</span><span className="font-bold">{m.home}</span></div>
-                                    <span className="text-xl font-bold">{m.homeScore} : {m.awayScore}</span>
-                                    <div className="flex items-center gap-2"><span className="font-bold">{m.away}</span><span className="text-2xl">{COUNTRY_FLAGS[m.away]}</span></div>
-                                </div>
-                                <div className="bg-slate-950 p-3 rounded-xl flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-500">YOUR PREDICTION</span>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex gap-2 items-center"><button onClick={() => updatePrediction(m.id, 'home', Math.max(0, pred.home - 1))} className="bg-slate-800 px-2 rounded">-</button><span>{pred.home}</span><button onClick={() => updatePrediction(m.id, 'home', pred.home + 1)} className="bg-slate-800 px-2 rounded">+</button></div>
-                                        <div className="flex gap-2 items-center"><button onClick={() => updatePrediction(m.id, 'away', Math.max(0, pred.away - 1))} className="bg-slate-800 px-2 rounded">-</button><span>{pred.away}</span><button onClick={() => updatePrediction(m.id, 'away', pred.away + 1)} className="bg-slate-800 px-2 rounded">+</button></div>
-                                    </div>
-                                </div>
-                                {adminMode && (
-                                    <div className="flex gap-2 mt-4 pt-4 border-t border-slate-700">
-                                        <button onClick={() => updateMatch(m.id, 'homeScore', m.homeScore + 1)} className="bg-amber-600 px-2 rounded text-xs">Home +</button>
-                                        <button onClick={() => updateMatch(m.id, 'awayScore', m.awayScore + 1)} className="bg-amber-600 px-2 rounded text-xs">Away +</button>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        );
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SprocketSync GPS - Moto Dashboard</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Leaflet.js Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <style>
+    body {
+      background-color: #070a13;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
     }
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-    </script>
+    
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    
+    .mile-marker {
+      background-color: #eab308;
+      border: 2px solid #ffffff;
+      color: #000000;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body class="h-[100dvh] w-screen flex flex-col overflow-hidden bg-[#070a13]">
+
+  <!-- Core Header -->
+  <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 z-50">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg bg-yellow-500 flex items-center justify-center">
+        <i class="fa-solid fa-motorcycle text-slate-950"></i>
+      </div>
+      <div>
+        <h1 class="text-sm font-black tracking-wider text-slate-100">SPROCKETSYNC <span class="text-yellow-500">GPS</span></h1>
+        <p class="text-[10px] text-slate-400 font-semibold tracking-widest">CALIBRATOR & CO-PILOT</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <!-- High Contrast GPS Lock Status Badge -->
+      <span id="gps-status" class="text-[10px] px-2.5 py-1 rounded bg-slate-950 border border-slate-850 text-slate-400 font-bold flex items-center gap-1.5 shadow">
+        <span class="w-2 h-2 rounded-full bg-slate-600"></span> GPS OFF
+      </span>
+      <span id="simulation-badge" class="text-[10px] px-2.5 py-1 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-bold hidden">
+        SIMULATING
+      </span>
+    </div>
+  </header>
+
+  <!-- Main Scrollable Section -->
+  <main class="flex-1 overflow-y-auto relative">
+
+    <!-- TAB 1: COCKPIT -->
+    <section id="tab-cockpit" class="p-4 space-y-4 max-w-xl mx-auto block">
+
+      <!-- Hardware Diagnostic Console -->
+      <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 shadow-inner">
+        <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-slate-800/60">
+          <span class="text-[10px] font-black tracking-wider text-emerald-400 uppercase flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span> Live Hardware Console
+          </span>
+          <button id="btn-manual-gps-check" class="text-[9px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 hover:border-yellow-500 hover:text-yellow-500 font-bold text-slate-400 uppercase transition-all">
+            <i class="fa-solid fa-location-arrow"></i> Test GPS Lock
+          </button>
+        </div>
+        <!-- Terminal event log outputs -->
+        <div id="diagnostic-terminal" class="font-mono text-[10px] text-slate-300 space-y-1 max-h-36 overflow-y-auto p-2 bg-[#04060b] rounded border border-slate-900">
+          <div class="text-slate-500">[SYSTEM] Application booting sequence initiated...</div>
+          <div class="text-slate-500">[SYSTEM] Map interface successfully loaded.</div>
+          <div class="text-yellow-500">[GPS] Awaiting hardware activation command...</div>
+        </div>
+      </div>
+      
+      <!-- Speedometer Gauge Card -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-6 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
+        <div class="absolute top-2 right-2 flex gap-1">
+          <button id="btn-toggle-unit" class="text-[10px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition">
+            UNIT: <span id="lbl-unit-setting">MPH</span>
+          </button>
+          <button id="btn-audio-toggle" class="text-[10px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-green-400 font-bold transition flex items-center gap-1">
+            <i id="audio-icon" class="fa-solid fa-volume-high"></i> TTS
+          </button>
+        </div>
+
+        <span class="text-xs tracking-widest font-bold text-slate-400">CURRENT SPEED</span>
+        
+        <!-- Big Digits Speed Display -->
+        <div class="flex items-baseline my-3">
+          <span id="txt-speed" class="text-7xl font-black font-mono tracking-tighter text-yellow-500 drop-shadow-[0_0_15px_rgba(234,179,8,0.2)]">0</span>
+          <span class="text-slate-400 font-bold ml-1 text-lg" id="txt-unit-label">mph</span>
+        </div>
+
+        <!-- Corrected Speed Cheat-Indicator -->
+        <div class="w-full mt-2 pt-3 border-t border-slate-800/60 text-center flex justify-around items-center gap-4">
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Raw GPS</div>
+            <div class="text-lg font-bold text-cyan-400 font-mono"><span id="txt-raw-gps">0.0</span> <span class="text-xs">mph</span></div>
+          </div>
+          <div class="h-6 w-[1px] bg-slate-800"></div>
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Estimated Speedo</div>
+            <div class="text-lg font-bold text-yellow-600 font-mono"><span id="txt-calc-speedo">0</span> <span class="text-xs">mph</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Statistics Grid -->
+      <div class="grid grid-cols-2 gap-3">
+        <!-- Top Speed -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-rose-950/50 border border-rose-900/40 text-rose-400 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-gauge-high"></i>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 font-bold uppercase">Top Speed</div>
+            <div class="text-xl font-extrabold text-slate-200 font-mono"><span id="txt-top-speed">0.0</span> <span class="text-[10px] text-slate-400">mph</span></div>
+          </div>
+        </div>
+
+        <!-- Total Distance -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-cyan-950/50 border border-cyan-900/40 text-cyan-400 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-road"></i>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 font-bold uppercase">Distance</div>
+            <div class="text-xl font-extrabold text-slate-200 font-mono"><span id="txt-distance">0.00</span> <span class="text-[10px] text-slate-400">mi</span></div>
+          </div>
+        </div>
+
+        <!-- Duration -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-amber-950/50 border border-amber-900/40 text-amber-400 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-stopwatch"></i>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 font-bold uppercase">Duration</div>
+            <div class="text-lg font-extrabold text-slate-200 font-mono" id="txt-duration">00:00:00</div>
+          </div>
+        </div>
+
+        <!-- Milestones -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-emerald-950/50 border border-emerald-900/40 text-emerald-400 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-location-dot"></i>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 font-bold uppercase">Milestones</div>
+            <div class="text-xl font-extrabold text-slate-200 font-mono"><span id="txt-milestones-count">0</span> <span class="text-[10px] text-slate-400">dropped</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Operations Panel -->
+      <div class="flex gap-3">
+        <button id="btn-start-ride" class="flex-1 py-4 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-lg tracking-wider transition-all shadow-lg flex items-center justify-center gap-2">
+          <i class="fa-solid fa-play"></i> START RIDE
+        </button>
+        <button id="btn-stop-ride" class="flex-1 py-4 px-6 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-lg tracking-wider transition-all shadow-lg hidden items-center justify-center gap-2">
+          <i class="fa-solid fa-square"></i> STOP & SAVE
+        </button>
+      </div>
+
+      <!-- Quick Desk Simulator Switch -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs font-black tracking-wide text-slate-300 uppercase flex items-center gap-2">
+            <i class="fa-solid fa-laptop-code text-cyan-400"></i> Local Desk Simulation
+          </h3>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="sim-toggle-switch" class="sr-only peer">
+            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+          </label>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          Switch this on to run an immediate virtual test cruise from Gosport along the A32. This bypasses real-world GPS permission requests so you can verify features instantly!
+        </p>
+      </div>
+
+      <!-- Map Display Area -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div class="p-3 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
+          <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-map-location-dot text-yellow-500"></i> LIVE TRACK ROUTE
+          </span>
+          <span class="text-[10px] text-slate-400 font-bold">Tap mile markers for logged speed</span>
+        </div>
+        <div id="map-canvas" class="h-80 w-full bg-slate-950"></div>
+      </div>
+
+    </section>
+
+    <!-- TAB 2: SPROCKETS & CALIBRATION -->
+    <section id="tab-calibrator" class="p-4 space-y-4 max-w-xl mx-auto hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+        <h2 class="text-base font-black text-slate-200 mb-1 tracking-wide uppercase flex items-center gap-2">
+          <i class="fa-solid fa-gears text-yellow-500"></i> Sprocket Speedometer Calibration
+        </h2>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Changing sprockets alters final drive ratios. Since motorcycle speedometers measure shaft output speed, gearing changes throw speed calculations off.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 border-b border-slate-800 pb-2">
+        <button id="calc-mode-sprocket" class="py-2.5 px-3 rounded-lg bg-yellow-500 text-slate-950 font-black text-xs text-center uppercase tracking-wider">
+          <i class="fa-solid fa-cog"></i> Sprocket Count
+        </button>
+        <button id="calc-mode-gps" class="py-2.5 px-3 rounded-lg bg-slate-800 text-slate-300 font-bold text-xs text-center uppercase tracking-wider">
+          <i class="fa-solid fa-satellite"></i> GPS Vs Speedo
+        </button>
+      </div>
+
+      <!-- Config panel 1 -->
+      <div id="panel-sprocket-math" class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] text-slate-400 font-black uppercase mb-1">Original Front Teeth</label>
+            <input type="number" id="input-orig-front" value="15" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-slate-100 text-sm font-bold">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400 font-black uppercase mb-1">Original Rear Teeth</label>
+            <input type="number" id="input-orig-rear" value="45" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-slate-100 text-sm font-bold">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400 font-black uppercase mb-1">New Front Teeth</label>
+            <input type="number" id="input-new-front" value="14" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-slate-100 text-sm font-bold">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400 font-black uppercase mb-1">New Rear Teeth</label>
+            <input type="number" id="input-new-rear" value="47" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-slate-100 text-sm font-bold">
+          </div>
+        </div>
+      </div>
+
+      <!-- Config panel 2 -->
+      <div id="panel-gps-math" class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4 hidden">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] text-slate-400 font-black uppercase mb-1">Speedometer Readout</label>
+            <input type="number" id="input-read-speedo" value="70" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-slate-100 text-sm font-bold">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400 font-black uppercase mb-1">Actual GPS Speed</label>
+            <input type="number" id="input-read-gps" value="62" class="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-3 text-slate-100 text-sm font-bold">
+          </div>
+        </div>
+      </div>
+
+      <!-- Correction Results -->
+      <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center">
+        <span class="text-[10px] font-black tracking-widest text-slate-400 uppercase">CALIBRATION FACTOR</span>
+        <span id="txt-calc-factor" class="text-3xl font-extrabold text-cyan-400 font-mono my-1">1.000</span>
+        <p class="text-xs text-slate-300 mt-1" id="txt-calibration-summary"></p>
+      </div>
+
+      <!-- Translation Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+        <h3 class="text-xs font-black tracking-wide text-slate-200 uppercase mb-3 flex justify-between items-center">
+          <span><i class="fa-solid fa-list-ol text-cyan-400"></i> Conversion Cheat Sheet</span>
+          <span class="text-[10px] text-slate-400">Tape this to your tank!</span>
+        </h3>
+        <div class="grid grid-cols-2 gap-2 text-xs font-mono" id="conversion-sheet-body"></div>
+      </div>
+    </section>
+
+    <!-- TAB 3: SAVED RIDES -->
+    <section id="tab-history" class="p-4 space-y-4 max-w-xl mx-auto hidden">
+      <div class="flex justify-between items-center">
+        <h2 class="text-base font-black text-slate-200 tracking-wide uppercase">
+          <i class="fa-solid fa-clock-rotate-left text-yellow-500"></i> Tracked Rides History
+        </h2>
+        <button id="btn-clear-history" class="text-[10px] px-3 py-1.5 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/40 font-bold transition">
+          <i class="fa-solid fa-trash-can"></i> CLEAR ALL
+        </button>
+      </div>
+      <div id="history-list-container" class="space-y-3"></div>
+    </section>
+
+  </main>
+
+  <!-- GPS Fail Helper Dialog -->
+  <div id="gps-helper-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[999999] flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-full bg-yellow-500/20 text-yellow-500 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-location-crosshairs"></i>
+        </div>
+        <div>
+          <h3 class="font-black text-slate-100 uppercase tracking-wide">GPS Connection Guide</h3>
+          <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Security Permissions</p>
+        </div>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed">
+        Your browser context is blocking access to physical GPS hardware. This is standard safety behavior inside preview tools and non-secure environments.
+      </p>
+      <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2">
+        <p class="text-[11px] text-slate-400 font-bold text-yellow-500"><i class="fa-solid fa-circle-check"></i> To run on your bike:</p>
+        <p class="text-[11px] text-slate-300">Upload this file to an HTTPS website (like GitHub Pages, Netlify, or Vercel). Once opened over HTTPS, your iPhone's native GPS will unlock instantly!</p>
+        <p class="text-[11px] text-slate-400 mt-2 font-bold text-cyan-400"><i class="fa-solid fa-laptop"></i> To test on your couch:</p>
+        <p class="text-[11px] text-slate-300">Tap <strong class="text-cyan-400">Enable Simulation</strong> below to bypass hardware checks and watch a pre-recorded test run.</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="activateSimulationViaModal()" class="flex-1 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs rounded-xl uppercase tracking-wider transition-all">
+          Enable Simulation
+        </button>
+        <button onclick="closeGPSModal()" class="py-3 px-5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl uppercase transition-all">
+          Close Window
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Action Toast -->
+  <div id="toast-notification" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900 border-2 border-yellow-500 text-slate-100 text-xs font-bold px-4 py-3 rounded-xl shadow-2xl z-[99999] opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2 max-w-[90%]">
+    <i class="fa-solid fa-circle-info text-yellow-500"></i>
+    <span id="toast-message">Testing active</span>
+  </div>
+
+  <!-- Bottom Navigation Menu -->
+  <nav class="h-16 bg-slate-950 border-t border-slate-800 flex items-center justify-around shrink-0 z-[10000] px-2 shadow-inner">
+    <button id="nav-btn-cockpit" onclick="switchTab('tab-cockpit', 'nav-btn-cockpit')" class="flex-1 h-full flex flex-col items-center justify-center text-yellow-500 transition-colors">
+      <i class="fa-solid fa-gauge text-xl pointer-events-none"></i>
+      <span class="text-[10px] mt-1 font-bold pointer-events-none">Cockpit</span>
+    </button>
+    <button id="nav-btn-calibrator" onclick="switchTab('tab-calibrator', 'nav-btn-calibrator')" class="flex-1 h-full flex flex-col items-center justify-center text-slate-400 hover:text-slate-100 transition-colors">
+      <i class="fa-solid fa-sliders text-xl pointer-events-none"></i>
+      <span class="text-[10px] mt-1 font-bold pointer-events-none">Calibrator</span>
+    </button>
+    <button id="nav-btn-history" onclick="switchTab('tab-history', 'nav-btn-history')" class="flex-1 h-full flex flex-col items-center justify-center text-slate-400 hover:text-slate-100 transition-colors">
+      <i class="fa-solid fa-history text-xl pointer-events-none"></i>
+      <span class="text-[10px] mt-1 font-bold pointer-events-none">Saved Rides</span>
+    </button>
+  </nav>
+
+  <!-- Script logics -->
+  <script>
+    const state = {
+      isTracking: false,
+      isSimulating: false,
+      unit: 'mph',
+      currentSpeed: 0,
+      topSpeed: 0,
+      distance: 0, 
+      lastPosition: null,
+      startTime: null,
+      elapsedTime: 0, 
+      intervalId: null,
+      pointsList: [], 
+      milestones: [], 
+      
+      calibMode: 'sprocket', 
+      sprocket: {
+        origFront: 15,
+        origRear: 45,
+        newFront: 14,
+        newRear: 47
+      },
+      manualCompare: {
+        speedo: 70,
+        gps: 62
+      },
+      calibFactor: 1.0,
+
+      ttsEnabled: true,
+      lastAnnouncedMilestone: 0,
+      wakeLock: null
+    };
+
+    const simulationPath = [
+      { lat: 50.7941, lng: -1.1243, speed: 25 }, 
+      { lat: 50.8010, lng: -1.1290, speed: 32 },
+      { lat: 50.8250, lng: -1.1400, speed: 45 },
+      { lat: 50.8450, lng: -1.1620, speed: 50 }, 
+      { lat: 50.8650, lng: -1.1710, speed: 30 }, 
+      { lat: 50.8850, lng: -1.1820, speed: 55 }, 
+      { lat: 50.9020, lng: -1.1850, speed: 64 }, 
+      { lat: 50.9210, lng: -1.1650, speed: 71 }, 
+      { lat: 50.9380, lng: -1.1510, speed: 74 }, 
+      { lat: 50.9520, lng: -1.1420, speed: 68 }, 
+      { lat: 50.9650, lng: -1.1350, speed: 40 }, 
+      { lat: 50.9850, lng: -1.1190, speed: 58 },
+      { lat: 51.0120, lng: -1.0980, speed: 62 }, 
+      { lat: 51.0320, lng: -1.0850, speed: 35 }  
+    ];
+    let simIndex = 0;
+    let simTimerId = null;
+
+    const APP_STORAGE_KEY = 'sprocketsync_rides_v1';
+
+    let map = null;
+    let pathPolyline = null;
+    let liveMarker = null;
+    let mapMarkersList = [];
+    let watchId = null;
+
+    function addLog(text, color = 'text-slate-300') {
+      const terminal = document.getElementById('diagnostic-terminal');
+      if (terminal) {
+        const line = document.createElement('div');
+        line.className = color;
+        const timeStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        line.innerHTML = `<span class="text-slate-500">[${timeStr}]</span> ${text}`;
+        terminal.appendChild(line);
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+      console.log(`[Diagnostic] ${text}`);
+    }
+
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          state.wakeLock = await navigator.wakeLock.request('screen');
+          addLog("Wake Lock API active. Screen dimming disabled.", "text-emerald-400");
+        } catch (err) {
+          addLog("Wake Lock API unsupported on this browser.", "text-slate-500");
+        }
+      }
+    }
+
+    function releaseWakeLock() {
+      if (state.wakeLock) {
+        state.wakeLock.release().then(() => {
+          state.wakeLock = null;
+        });
+      }
+    }
+
+    function showToast(message) {
+      const el = document.getElementById('toast-notification');
+      if (el) {
+        document.getElementById('toast-message').textContent = message;
+        el.style.opacity = '1';
+        el.style.pointerEvents = 'auto';
+        setTimeout(() => {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+        }, 4000);
+      }
+    }
+
+    function announceWithVoice(text) {
+      if (!state.ttsEnabled) return;
+      if ('speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel(); 
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 1.0;
+          utterance.volume = 1.0;
+          window.speechSynthesis.speak(utterance);
+        } catch (err) {
+          console.warn("TTS blocked.");
+        }
+      }
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3; 
+      const phi1 = lat1 * Math.PI/180;
+      const phi2 = lat2 * Math.PI/180;
+      const deltaPhi = (lat2-lat1) * Math.PI/180;
+      const deltaLambda = (lon2-lon1) * Math.PI/180;
+
+      const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+                Math.cos(phi1) * Math.cos(phi2) *
+                Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+      return R * c; 
+    }
+
+    function initMap() {
+      try {
+        if (typeof L === 'undefined') {
+          addLog("Warning: Leaflet map library failed to load. Operating in map-less dashboard mode.", "text-yellow-500");
+          const container = document.getElementById('map-canvas');
+          if (container) {
+            container.innerHTML = `
+              <div class="h-full w-full flex flex-col items-center justify-center text-slate-500 p-4 text-center bg-slate-950">
+                <i class="fa-solid fa-triangle-exclamation text-3xl text-yellow-500 mb-2"></i>
+                <p class="text-xs font-bold text-slate-400">Map Interface Offline</p>
+                <p class="text-[10px] text-slate-600 mt-1">Browser security blocks or network is down. The speedometer still remains 100% active.</p>
+              </div>
+            `;
+          }
+          return;
+        }
+
+        const defaultCenter = [50.7941, -1.1243];
+        map = L.map('map-canvas', {
+          zoomControl: false,
+          attributionControl: false
+        }).setView(defaultCenter, 13);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 20
+        }).addTo(map);
+
+        pathPolyline = L.polyline([], {
+          color: '#22d3ee', 
+          weight: 6,
+          opacity: 0.85
+        }).addTo(map);
+
+        const liveIcon = L.divIcon({
+          className: 'live-gps-dot',
+          html: `<div class="relative flex h-5 w-5">
+                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                 <span class="relative inline-flex rounded-full h-5 w-5 bg-cyan-500 border-2 border-white shadow-lg"></span>
+               </div>`,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        });
+
+        liveMarker = L.marker(defaultCenter, { icon: liveIcon }).addTo(map);
+      } catch (err) {
+        addLog(`Map initialization failed gracefully: ${err.message}`, "text-slate-500");
+      }
+    }
+
+    function updateMapPoints() {
+      if (!map || !pathPolyline || state.pointsList.length === 0) return;
+      try {
+        const latLngs = state.pointsList.map(p => [p.lat, p.lng]);
+        pathPolyline.setLatLngs(latLngs);
+        const lastPoint = latLngs[latLngs.length - 1];
+        if (liveMarker) liveMarker.setLatLng(lastPoint);
+        map.panTo(lastPoint);
+      } catch (e) {
+        console.warn("Map coordinates redraw error suppressed.");
+      }
+    }
+
+    function checkAndDropMilestones(newPoint) {
+      if (state.pointsList.length < 2) return;
+
+      const distanceInUnit = state.unit === 'mph' 
+        ? state.distance * 0.000621371 
+        : state.distance * 0.001; 
+
+      const currentMilestoneIndex = Math.floor(distanceInUnit);
+
+      if (currentMilestoneIndex > 0 && currentMilestoneIndex > state.milestones.length) {
+        const milestoneObj = {
+          number: currentMilestoneIndex,
+          lat: newPoint.lat,
+          lng: newPoint.lng,
+          speed: state.currentSpeed 
+        };
+
+        state.milestones.push(milestoneObj);
+        state.lastAnnouncedMilestone = currentMilestoneIndex;
+
+        const countText = document.getElementById('txt-milestones-count');
+        if (countText) countText.textContent = state.milestones.length;
+
+        addLog(`Milestone ${currentMilestoneIndex} reached at ${Math.round(state.currentSpeed)} mph!`, "text-yellow-400 font-bold");
+
+        if (map) {
+          try {
+            const customIcon = L.divIcon({
+              className: 'mile-marker',
+              html: `<span>${currentMilestoneIndex}</span>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12]
+            });
+
+            const displaySpeed = Math.round(milestoneObj.speed);
+            const unitText = state.unit === 'mph' ? 'mph' : 'km/h';
+
+            const marker = L.marker([milestoneObj.lat, milestoneObj.lng], { icon: customIcon })
+              .addTo(map)
+              .bindPopup(`
+                <div class="text-xs font-sans text-slate-100">
+                  <p class="font-black text-yellow-500 uppercase tracking-wider text-[10px] mb-1">
+                    Milestone ${currentMilestoneIndex}
+                  </p>
+                  <div class="flex items-baseline gap-1 mt-0.5">
+                    <span class="text-lg font-extrabold text-white">${displaySpeed}</span>
+                    <span class="text-slate-400 font-semibold">${unitText}</span>
+                  </div>
+                </div>
+              `);
+
+            mapMarkersList.push(marker);
+          } catch (err) {
+            console.warn("Milestone icon placement failed.");
+          }
+        }
+
+        announceWithVoice(`Mile ${currentMilestoneIndex} completed at ${Math.round(milestoneObj.speed)} miles per hour.`);
+      }
+    }
+
+    function updateSprocketCalibration() {
+      try {
+        if (state.calibMode === 'sprocket') {
+          const origFront = parseFloat(document.getElementById('input-orig-front').value) || 15;
+          const origRear = parseFloat(document.getElementById('input-orig-rear').value) || 45;
+          const newFront = parseFloat(document.getElementById('input-new-front').value) || 14;
+          const newRear = parseFloat(document.getElementById('input-new-rear').value) || 47;
+
+          state.sprocket = { origFront, origRear, newFront, newRear };
+
+          const origRatio = origFront / origRear;
+          const newRatio = newFront / newRear;
+          state.calibFactor = newRatio / origRatio;
+        } else {
+          const speedoVal = parseFloat(document.getElementById('input-read-speedo').value) || 70;
+          const gpsVal = parseFloat(document.getElementById('input-read-gps').value) || 62;
+
+          state.manualCompare = { speedo: speedoVal, gps: gpsVal };
+          state.calibFactor = speedoVal > 0 ? (gpsVal / speedoVal) : 1.0;
+        }
+
+        const factorEl = document.getElementById('txt-calc-factor');
+        if (factorEl) {
+          factorEl.innerHTML = `${state.calibFactor.toFixed(3)} <span class="text-xs text-slate-400">(Multiplier)</span>`;
+        }
+
+        const percentageDiff = Math.abs((1 - state.calibFactor) * 100).toFixed(1);
+        const isFaster = state.calibFactor < 1.0;
+        const statusText = isFaster ? 'faster' : 'slower';
+        
+        const summaryEl = document.getElementById('txt-calibration-summary');
+        if (summaryEl) {
+          summaryEl.innerHTML = 
+            `Your speedometer reads <span class="text-yellow-500 font-bold">${percentageDiff}% ${statusText}</span> than GPS actual speed.`;
+        }
+
+        buildConversionCheatSheet();
+      } catch (err) {
+        console.warn("Calibration calculation math errored.");
+      }
+    }
+
+    function buildConversionCheatSheet() {
+      const container = document.getElementById('conversion-sheet-body');
+      if (!container) return;
+      container.innerHTML = '';
+
+      for (let speedo = 20; speedo <= 90; speedo += 10) {
+        const actual = Math.round(speedo * state.calibFactor);
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800/60";
+        row.innerHTML = `
+          <div class="flex items-center gap-1.5">
+            <span class="text-[9px] text-slate-400 uppercase font-black">SPEEDO</span>
+            <span class="text-sm font-bold text-slate-300 font-mono">${speedo}</span>
+          </div>
+          <i class="fa-solid fa-arrow-right-long text-slate-600 text-[10px]"></i>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[9px] text-cyan-400 uppercase font-black">ACTUAL</span>
+            <span class="text-sm font-black text-cyan-400 font-mono">${actual}</span>
+          </div>
+        `;
+        container.appendChild(row);
+      }
+    }
+
+    function updateCockpitUI() {
+      try {
+        const displaySpeed = state.currentSpeed;
+        document.getElementById('txt-speed').textContent = Math.round(displaySpeed);
+        document.getElementById('txt-raw-gps').textContent = state.currentSpeed.toFixed(1);
+        
+        const speedoCalculated = state.calibFactor > 0 ? (state.currentSpeed / state.calibFactor) : state.currentSpeed;
+        document.getElementById('txt-calc-speedo').textContent = Math.round(speedoCalculated);
+        document.getElementById('txt-top-speed').textContent = state.topSpeed.toFixed(1);
+
+        const distanceDisplay = state.unit === 'mph'
+          ? state.distance * 0.000621371 
+          : state.distance * 0.001; 
+        document.getElementById('txt-distance').textContent = distanceDisplay.toFixed(2);
+      } catch (err) {
+        console.warn("Cockpit UI draw skipped.");
+      }
+    }
+
+    function formatTime(sec) {
+      const hrs = Math.floor(sec / 3600).toString().padStart(2, '0');
+      const mins = Math.floor((sec % 3600) / 60).toString().padStart(2, '0');
+      const secs = (sec % 60).toString().padStart(2, '0');
+      return `${hrs}:${mins}:${secs}`;
+    }
+
+    function runTimer() {
+      state.elapsedTime++;
+      const durationEl = document.getElementById('txt-duration');
+      if (durationEl) durationEl.textContent = formatTime(state.elapsedTime);
+    }
+
+    function updateGPSBadgeStatus(customStatus = "") {
+      const gpsBadge = document.getElementById('gps-status');
+      if (!gpsBadge) return;
+      
+      if (customStatus === "LOCKING") {
+        gpsBadge.className = "text-[10px] px-2.5 py-1 rounded bg-yellow-950 text-yellow-500 border border-yellow-800 font-bold flex items-center gap-1.5 shadow-md";
+        gpsBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span> LOCKING GPS...`;
+        return;
+      }
+
+      if (customStatus === "OFF") {
+        gpsBadge.className = "text-[10px] px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-855 font-bold flex items-center gap-1.5";
+        gpsBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-600"></span> GPS OFF`;
+        return;
+      }
+
+      if (customStatus === "ERROR") {
+        gpsBadge.className = "text-[10px] px-2.5 py-1 rounded bg-rose-950 text-rose-400 border border-rose-800 font-bold flex items-center gap-1.5";
+        gpsBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> GPS ERROR`;
+        return;
+      }
+
+      if (state.isTracking) {
+        if (state.isSimulating) {
+          gpsBadge.className = "text-[10px] px-2.5 py-1 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-bold flex items-center gap-1.5 shadow-md";
+          gpsBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span> SIM ACTIVE`;
+        } else {
+          gpsBadge.className = "text-[10px] px-2.5 py-1 rounded bg-green-950 text-green-400 border border-green-800 font-bold flex items-center gap-1.5 shadow-md";
+          gpsBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 animate-ping"></span> GPS ACTIVE`;
+        }
+      } else {
+        gpsBadge.className = "text-[10px] px-2.5 py-1 rounded bg-slate-950 text-slate-400 border border-slate-855 font-bold flex items-center gap-1.5";
+        gpsBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-slate-600"></span> GPS STANDBY`;
+      }
+    }
+
+    function onGPSPositionReceived(position) {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      
+      let rawSpeedMps = position.coords.speed || 0;
+      if (rawSpeedMps < 0) rawSpeedMps = 0; 
+      
+      const speedInUnit = state.unit === 'mph' ? rawSpeedMps * 2.23694 : rawSpeedMps * 3.6;
+
+      if (state.pointsList.length === 0) {
+        addLog(`Lock established! Position: ${lat.toFixed(4)}, ${lng.toFixed(4)}`, "text-emerald-400 font-bold");
+      }
+
+      if (!state.isTracking) return;
+
+      const newPoint = { lat, lng, speed: speedInUnit, timestamp: Date.now() };
+
+      if (state.lastPosition) {
+        const deltaMeters = getDistance(state.lastPosition.lat, state.lastPosition.lng, newPoint.lat, newPoint.lng);
+        if (deltaMeters < 500) { 
+          state.distance += deltaMeters;
+        }
+      }
+
+      state.currentSpeed = speedInUnit;
+      if (speedInUnit > state.topSpeed) {
+        state.topSpeed = speedInUnit;
+        const roundedTop = Math.floor(state.topSpeed);
+        if (roundedTop % 10 === 0 && roundedTop > 30) {
+          announceWithVoice(`New top speed ${roundedTop} miles per hour.`);
+        }
+      }
+
+      state.pointsList.push(newPoint);
+      state.lastPosition = newPoint;
+
+      updateGPSBadgeStatus();
+      updateCockpitUI();
+      updateMapPoints();
+      checkAndDropMilestones(newPoint);
+    }
+
+    function onGPSError(err) {
+      let errMsg = "Unknown Error";
+      if (err.code === 1) {
+        errMsg = "Permission Denied. Geolocation blocked by iOS or browser sandbox.";
+      } else if (err.code === 2) {
+        errMsg = "Position Unavailable. Satellite connection failed.";
+      } else if (err.code === 3) {
+        errMsg = "Timeout. Phone took too long searching for satellite coordinate feed.";
+      }
+      
+      addLog(`GPS Connection Fault: ${errMsg} (Code ${err.code})`, "text-rose-400 font-bold");
+      updateGPSBadgeStatus("ERROR");
+
+      if (state.isTracking && !state.isSimulating) {
+        const modal = document.getElementById('gps-helper-modal');
+        if (modal) modal.classList.remove('hidden');
+      }
+    }
+
+    function startRealGPS() {
+      addLog("Initializing GPS watch... requesting geolocation channel...", "text-yellow-500");
+      updateGPSBadgeStatus("LOCKING");
+
+      if (!navigator.geolocation) {
+        addLog("Critical: Geolocation API is completely missing from this browser/context.", "text-rose-500 font-bold");
+        updateGPSBadgeStatus("ERROR");
+        const modal = document.getElementById('gps-helper-modal');
+        if (modal) modal.classList.remove('hidden');
+        return;
+      }
+
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      };
+
+      try {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            addLog("Approval Granted! Launching background watchPosition...", "text-emerald-400");
+            onGPSPositionReceived(position);
+            watchId = navigator.geolocation.watchPosition(onGPSPositionReceived, onGPSError, options);
+          },
+          (err) => {
+            onGPSError(err);
+          },
+          options
+        );
+      } catch (err) {
+        addLog(`System Execution Crash: ${err.message}`, "text-rose-500");
+        updateGPSBadgeStatus("ERROR");
+      }
+    }
+
+    function stopRealGPS() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        addLog("GPS satellite hardware tracker disabled.", "text-slate-500");
+      }
+      updateGPSBadgeStatus("OFF");
+    }
+
+    // SIMULATION ENGINE
+    function runSimulatedStep() {
+      if (!state.isSimulating) return;
+
+      const startPos = simulationPath[simIndex];
+      const endPos = simulationPath[(simIndex + 1) % simulationPath.length];
+      
+      let stepCount = 10;
+      let stepIdx = 0;
+
+      function interpolate() {
+        if (!state.isSimulating) return;
+
+        const fraction = stepIdx / stepCount;
+        const currentLat = startPos.lat + (endPos.lat - startPos.lat) * fraction;
+        const currentLng = startPos.lng + (endPos.lng - startPos.lng) * fraction;
+        const currentSpeed = startPos.speed + (endPos.speed - startPos.speed) * fraction;
+
+        const simulatedCoords = {
+          coords: {
+            latitude: currentLat,
+            longitude: currentLng,
+            speed: currentSpeed / 2.23694 
+          },
+          timestamp: Date.now()
+        };
+
+        onGPSPositionReceived(simulatedCoords);
+
+        stepIdx++;
+        if (stepIdx <= stepCount) {
+          simTimerId = setTimeout(interpolate, 350); 
+        } else {
+          simIndex = (simIndex + 1) % simulationPath.length;
+          simTimerId = setTimeout(runSimulatedStep, 500);
+        }
+      }
+
+      interpolate();
+    }
+
+    function startSimulation() {
+      state.isSimulating = true;
+      simIndex = 0;
+      addLog("Local desk simulation initiated along Hampshire route (A32).", "text-cyan-400");
+      
+      const badge = document.getElementById('simulation-badge');
+      if (badge) badge.classList.remove('hidden');
+      updateGPSBadgeStatus();
+      runSimulatedStep();
+    }
+
+    function stopSimulation() {
+      state.isSimulating = false;
+      if (simTimerId) {
+        clearTimeout(simTimerId);
+        simTimerId = null;
+      }
+      addLog("Simulation engine deactivated.", "text-slate-500");
+      const badge = document.getElementById('simulation-badge');
+      if (badge) badge.classList.add('hidden');
+      updateGPSBadgeStatus();
+    }
+
+    function toggleTrackRide() {
+      try {
+        if (!state.isTracking) {
+          state.isTracking = true;
+          state.startTime = Date.now();
+          state.elapsedTime = 0;
+          state.distance = 0;
+          state.currentSpeed = 0;
+          state.topSpeed = 0;
+          state.pointsList = [];
+          state.milestones = [];
+          state.lastPosition = null;
+
+          addLog("New ride logging initiated. Awaiting GPS packets...", "text-yellow-400");
+
+          if (map) {
+            try {
+              mapMarkersList.forEach(m => map.removeLayer(m));
+              mapMarkersList = [];
+              if (pathPolyline) pathPolyline.setLatLngs([]);
+            } catch (err) {
+              console.warn("Map tracing clear error suppressed.");
+            }
+          }
+
+          const milestoneTxt = document.getElementById('txt-milestones-count');
+          if (milestoneTxt) milestoneTxt.textContent = '0';
+          const durationTxt = document.getElementById('txt-duration');
+          if (durationTxt) durationTxt.textContent = '00:00:00';
+          
+          updateCockpitUI();
+          requestWakeLock();
+          announceWithVoice("Starting ride tracker.");
+
+          state.intervalId = setInterval(runTimer, 1000);
+
+          if (state.isSimulating) {
+            startSimulation();
+          } else {
+            startRealGPS();
+          }
+
+          const btnStart = document.getElementById('btn-start-ride');
+          const btnStop = document.getElementById('btn-stop-ride');
+          if (btnStart) btnStart.classList.add('hidden');
+          if (btnStop) btnStop.classList.remove('hidden');
+          
+          showToast("Ride tracking active!");
+        } else {
+          state.isTracking = false;
+          if (state.intervalId) {
+            clearInterval(state.intervalId);
+            state.intervalId = null;
+          }
+
+          if (state.isSimulating) {
+            stopSimulation();
+          } else {
+            stopRealGPS();
+          }
+
+          releaseWakeLock();
+          addLog(`Ride tracking finalized. Total distance run: ${ (state.distance * 0.000621371).toFixed(2) } mi. Top speed: ${state.topSpeed.toFixed(1)} mph.`, "text-emerald-400 font-bold");
+          announceWithVoice(`Ride completed. Distance calculated was ${ (state.distance * 0.000621371).toFixed(1) } miles.`);
+
+          const btnStart = document.getElementById('btn-start-ride');
+          const btnStop = document.getElementById('btn-stop-ride');
+          if (btnStop) btnStop.classList.add('hidden');
+          if (btnStart) btnStart.classList.remove('hidden');
+
+          saveCurrentRide();
+          showToast("Ride successfully archived!");
+        }
+      } catch (err) {
+        addLog(`Fault toggling logging sequence: ${err.message}`, "text-rose-500");
+      }
+    }
+
+    function saveCurrentRide() {
+      const newRideObj = {
+        id: 'ride_' + Date.now(),
+        dateString: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        distance: state.distance,
+        topSpeed: state.topSpeed,
+        duration: state.elapsedTime,
+        milestonesCount: state.milestones.length,
+        milestones: state.milestones,
+        path: state.pointsList 
+      };
+
+      let savedRides = [];
+      try {
+        const stored = localStorage.getItem(APP_STORAGE_KEY);
+        if (stored) savedRides = JSON.parse(stored);
+      } catch (e) {}
+
+      savedRides.unshift(newRideObj);
+      localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(savedRides));
+      buildHistoryList();
+    }
+
+    function buildHistoryList() {
+      const container = document.getElementById('history-list-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      let savedRides = [];
+      try {
+        const stored = localStorage.getItem(APP_STORAGE_KEY);
+        if (stored) savedRides = JSON.parse(stored);
+      } catch (e) {}
+
+      if (savedRides.length === 0) {
+        container.innerHTML = `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-500">
+            <i class="fa-solid fa-motorcycle text-4xl mb-3 block text-slate-600"></i>
+            <p class="text-sm font-bold text-slate-400">No saved rides tracked yet.</p>
+            <p class="text-[11px] mt-1 text-slate-500">Mount your phone, go for a spin, and tap STOP to save your stats!</p>
+          </div>
+        `;
+        return;
+      }
+
+      savedRides.forEach(ride => {
+        const distVal = state.unit === 'mph' ? ride.distance * 0.000621371 : ride.distance * 0.001;
+        const distUnit = state.unit === 'mph' ? 'mi' : 'km';
+        const speedUnit = state.unit === 'mph' ? 'mph' : 'km/h';
+
+        const card = document.createElement('div');
+        card.className = "bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 relative overflow-hidden";
+        card.innerHTML = `
+          <div class="flex justify-between items-start">
+            <div>
+              <span class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">${ride.dateString}</span>
+              <h3 class="text-sm font-black text-slate-100 mt-0.5">Track Run Summary</h3>
+            </div>
+            <button class="btn-delete-ride text-[11px] text-rose-500 hover:text-rose-400 px-2 py-1 rounded bg-rose-950/20" data-id="${ride.id}">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-center pt-2 border-t border-slate-800/60">
+            <div>
+              <span class="text-[9px] text-slate-500 font-bold uppercase block">Distance</span>
+              <span class="text-sm font-extrabold text-slate-200 font-mono">${distVal.toFixed(2)} <span class="text-[10px] text-slate-400 font-normal">${distUnit}</span></span>
+            </div>
+            <div>
+              <span class="text-[9px] text-slate-500 font-bold uppercase block">Top Speed</span>
+              <span class="text-sm font-extrabold text-yellow-500 font-mono">${Math.round(ride.topSpeed)} <span class="text-[10px] text-slate-400 font-normal">${speedUnit}</span></span>
+            </div>
+            <div>
+              <span class="text-[9px] text-slate-500 font-bold uppercase block">Duration</span>
+              <span class="text-sm font-extrabold text-slate-200 font-mono">${formatTime(ride.duration)}</span>
+            </div>
+          </div>
+
+          ${ride.milestones && ride.milestones.length > 0 ? `
+            <div class="bg-slate-950/60 rounded-lg p-2.5 mt-2">
+              <span class="text-[10px] font-black text-slate-400 block mb-1 uppercase tracking-wider">
+                <i class="fa-solid fa-circle-info text-yellow-500"></i> Milestone Speeds:
+              </span>
+              <div class="flex flex-wrap gap-1.5">
+                ${ride.milestones.map(m => `
+                  <span class="bg-slate-900 border border-slate-800 text-[10px] py-1 px-2 rounded font-mono text-slate-300">
+                    Mile ${m.number}: <strong class="text-yellow-500">${Math.round(m.speed)} ${speedUnit}</strong>
+                  </span>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <button class="btn-replay-map w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5" data-id="${ride.id}">
+            <i class="fa-solid fa-map-location-dot"></i> Plot Ride Coordinates on Map
+          </button>
+        `;
+        container.appendChild(card);
+      });
+
+      document.querySelectorAll('.btn-delete-ride').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          deleteRide(btn.getAttribute('data-id'));
+        };
+      });
+
+      document.querySelectorAll('.btn-replay-map').forEach(btn => {
+        btn.onclick = () => replayRideOnMap(btn.getAttribute('data-id'));
+      });
+    }
+
+    function deleteRide(id) {
+      let savedRides = [];
+      try {
+        const stored = localStorage.getItem(APP_STORAGE_KEY);
+        if (stored) savedRides = JSON.parse(stored);
+      } catch (e) {}
+
+      savedRides = savedRides.filter(r => r.id !== id);
+      localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(savedRides));
+      buildHistoryList();
+      showToast("Selected ride record deleted.");
+    }
+
+    function replayRideOnMap(id) {
+      let savedRides = [];
+      try {
+        const stored = localStorage.getItem(APP_STORAGE_KEY);
+        if (stored) savedRides = JSON.parse(stored);
+      } catch (e) {}
+
+      const selected = savedRides.find(r => r.id === id);
+      if (!selected) return;
+
+      switchTab('tab-cockpit', 'nav-btn-cockpit');
+
+      if (map) {
+        try {
+          mapMarkersList.forEach(m => map.removeLayer(m));
+          mapMarkersList = [];
+          pathPolyline.setLatLngs([]);
+
+          if (selected.path && selected.path.length > 0) {
+            const latLngs = selected.path.map(p => [p.lat, p.lng]);
+            pathPolyline.setLatLngs(latLngs);
+            
+            selected.milestones.forEach(m => {
+              const customIcon = L.divIcon({
+                className: 'mile-marker',
+                html: `<span>${m.number}</span>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12]
+              });
+              
+              const unitText = state.unit === 'mph' ? 'mph' : 'km/h';
+              const marker = L.marker([m.lat, m.lng], { icon: customIcon })
+                .addTo(map)
+                .bindPopup(`
+                  <div class="text-xs font-sans text-slate-100">
+                    <p class="font-black text-yellow-500 uppercase tracking-wider text-[10px] mb-1">
+                      Milestone ${m.number} (Reloaded)
+                    </p>
+                    <div class="flex items-baseline gap-1 mt-0.5">
+                      <span class="text-lg font-extrabold text-white">${Math.round(m.speed)}</span>
+                      <span class="text-slate-400 font-semibold">${unitText}</span>
+                    </div>
+                  </div>
+                `);
+              mapMarkersList.push(marker);
+            });
+
+            map.fitBounds(pathPolyline.getBounds(), { padding: [40, 40] });
+            showToast("Historical coordinates plotted successfully!");
+          } else {
+            showToast("No mapped GPS path available.");
+          }
+        } catch (err) {
+          console.warn("Failed to plot historical map route:", err);
+          showToast("Map drawing error. Loaded values are viewable below.");
+        }
+      } else {
+        showToast("Map is currently offline. Loaded values are viewable below.");
+      }
+    }
+
+    function switchTab(targetTabId, activeBtnId) {
+      try {
+        const tabCockpit = document.getElementById('tab-cockpit');
+        const tabCalibrator = document.getElementById('tab-calibrator');
+        const tabHistory = document.getElementById('tab-history');
+
+        if (tabCockpit) tabCockpit.classList.add('hidden');
+        if (tabCalibrator) tabCalibrator.classList.add('hidden');
+        if (tabHistory) tabHistory.classList.add('hidden');
+
+        const activeTab = document.getElementById(targetTabId);
+        if (activeTab) activeTab.classList.remove('hidden');
+
+        const buttonIds = ['nav-btn-cockpit', 'nav-btn-calibrator', 'nav-btn-history'];
+        buttonIds.forEach(id => {
+          const btn = document.getElementById(id);
+          if (btn) {
+            if (id === activeBtnId) {
+              btn.classList.remove('text-slate-400');
+              btn.classList.add('text-yellow-500');
+            } else {
+              btn.classList.remove('text-yellow-500');
+              btn.classList.add('text-slate-400');
+            }
+          }
+        });
+
+        if (targetTabId === 'tab-cockpit' && map) {
+          setTimeout(() => {
+            try {
+              map.invalidateSize();
+              if (state.pointsList.length > 0) {
+                updateMapPoints();
+              }
+            } catch (err) {
+              console.warn("Leaflet window resize error suppressed.");
+            }
+          }, 150);
+        }
+      } catch (err) {
+        console.error("Tab switch execution error:", err);
+      }
+    }
+
+    function closeGPSModal() {
+      const modal = document.getElementById('gps-helper-modal');
+      if (modal) modal.classList.add('hidden');
+      if (state.isTracking) {
+        stopRealGPS();
+      }
+    }
+
+    function activateSimulationViaModal() {
+      const modal = document.getElementById('gps-helper-modal');
+      if (modal) modal.classList.add('hidden');
+      
+      const simSwitch = document.getElementById('sim-toggle-switch');
+      if (simSwitch) simSwitch.checked = true;
+      
+      state.isSimulating = true;
+      
+      if (state.isTracking) {
+        stopRealGPS();
+        startSimulation();
+      } else {
+        toggleTrackRide();
+      }
+      showToast("Simulation engine activated successfully!");
+    }
+
+    // Manual immediate GPS unlock check
+    document.getElementById('btn-manual-gps-check').onclick = () => {
+      addLog("User-triggered testing call fired manually...", "text-yellow-500");
+      if (!navigator.geolocation) {
+        addLog("Critical: Geolocation API unsupported.", "text-rose-500");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          addLog(`Immediate Success! Lock obtained. Lat: ${pos.coords.latitude.toFixed(5)}, Lng: ${pos.coords.longitude.toFixed(5)}`, "text-emerald-400 font-bold");
+          updateGPSBadgeStatus("LOCKING");
+        },
+        (err) => {
+          let errName = "Unknown Position Issue";
+          if (err.code === 1) errName = "PERMISSION DENIED by browser context.";
+          if (err.code === 2) errName = "HARDWARE_UNAVAILABLE (No satellite access)";
+          if (err.code === 3) errName = "TIMEOUT waiting for lock";
+          addLog(`Fired Check Failed: ${errName}`, "text-rose-400");
+          updateGPSBadgeStatus("ERROR");
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    };
+
+    function runContextDiagnostic() {
+      const isIframe = window.self !== window.top;
+      const isHttps = window.location.protocol === 'https:';
+
+      addLog(`[DIAGNOSTIC] Protocol: ${window.location.protocol.toUpperCase()} | Sandboxed Frame: ${isIframe ? 'YES' : 'NO'}`);
+
+      if (isIframe) {
+        addLog("[SECURITY] WARNING: Running inside an embedded frame. Browsers routinely block GPS context inside frames.", "text-yellow-500");
+      }
+      if (!isHttps) {
+        addLog("[SECURITY] CRITICAL: Serving over unsecure HTTP. iOS Safari completely disables navigator.geolocation unless hosted over HTTPS.", "text-rose-400 font-bold");
+      }
+      if (!isIframe && isHttps) {
+        addLog("[SECURITY] CONFIRMED: Secure HTTPS and Top-Level browser window. Direct GPS hardware access is unlocked!", "text-emerald-400 font-bold");
+      }
+    }
+
+    // Page Load Setup Initialization
+    window.onload = function() {
+      initMap();
+      updateSprocketCalibration();
+      buildHistoryList();
+
+      // Run diagnostics instantly so the user knows exactly why their device behaves the way it does
+      runContextDiagnostic();
+
+      try {
+        const inputsToWatch = [
+          'input-orig-front', 'input-orig-rear', 'input-new-front', 'input-new-rear',
+          'input-read-speedo', 'input-read-gps'
+        ];
+        inputsToWatch.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.oninput = updateSprocketCalibration;
+          }
+        });
+      } catch (e) {
+        console.warn("Input bindings failed.");
+      }
+
+      const btnStart = document.getElementById('btn-start-ride');
+      if (btnStart) btnStart.onclick = toggleTrackRide;
+
+      const btnStop = document.getElementById('btn-stop-ride');
+      if (btnStop) btnStop.onclick = toggleTrackRide;
+
+      const clearHistory = document.getElementById('btn-clear-history');
+      if (clearHistory) {
+        clearHistory.onclick = () => {
+          if (confirm("Permanently clear your tracked rides?")) {
+            localStorage.removeItem(APP_STORAGE_KEY);
+            buildHistoryList();
+            showToast("All historical logs deleted.");
+          }
+        };
+      }
+
+      const simSwitch = document.getElementById('sim-toggle-switch');
+      if (simSwitch) {
+        simSwitch.onchange = function() {
+          state.isSimulating = this.checked;
+          updateGPSBadgeStatus();
+          if (state.isSimulating) {
+            showToast("Simulation armed. Click START RIDE to play.");
+          } else {
+            if (state.isTracking) {
+              toggleTrackRide(); 
+            }
+            showToast("Real GPS armed.");
+          }
+        };
+      }
+
+      const toggleUnitBtn = document.getElementById('btn-toggle-unit');
+      if (toggleUnitBtn) {
+        toggleUnitBtn.onclick = () => {
+          state.unit = state.unit === 'mph' ? 'kph' : 'mph';
+          document.getElementById('lbl-unit-setting').textContent = state.unit.toUpperCase();
+          document.getElementById('txt-unit-label').textContent = state.unit;
+          updateCockpitUI();
+          updateSprocketCalibration();
+          buildHistoryList();
+        };
+      }
+
+      const audioToggleBtn = document.getElementById('btn-audio-toggle');
+      if (audioToggleBtn) {
+        audioToggleBtn.onclick = () => {
+          state.ttsEnabled = !state.ttsEnabled;
+          const icon = document.getElementById('audio-icon');
+
+          if (state.ttsEnabled) {
+            audioToggleBtn.className = "text-[10px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-green-400 font-bold transition flex items-center gap-1";
+            if (icon) icon.className = "fa-solid fa-volume-high";
+            showToast("Audio Alerts Enabled!");
+            announceWithVoice("Audio feedback active.");
+          } else {
+            audioToggleBtn.className = "text-[10px] px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-500 font-bold transition flex items-center gap-1";
+            if (icon) icon.className = "fa-solid fa-volume-xmark";
+            showToast("Audio feedback muted.");
+          }
+        };
+      }
+
+      const btnSprocketMode = document.getElementById('calc-mode-sprocket');
+      if (btnSprocketMode) {
+        btnSprocketMode.onclick = () => {
+          state.calibMode = 'sprocket';
+          document.getElementById('panel-sprocket-math').classList.remove('hidden');
+          document.getElementById('panel-gps-math').classList.add('hidden');
+          btnSprocketMode.className = "py-2.5 px-3 rounded-lg bg-yellow-500 text-slate-950 font-black text-xs text-center uppercase tracking-wider";
+          document.getElementById('calc-mode-gps').className = "py-2.5 px-3 rounded-lg bg-slate-800 text-slate-300 font-bold text-xs text-center uppercase tracking-wider";
+          updateSprocketCalibration();
+        };
+      }
+
+      const btnGpsMode = document.getElementById('calc-mode-gps');
+      if (btnGpsMode) {
+        btnGpsMode.onclick = () => {
+          state.calibMode = 'gps';
+          document.getElementById('panel-sprocket-math').classList.add('hidden');
+          document.getElementById('panel-gps-math').classList.remove('hidden');
+          btnGpsMode.className = "py-2.5 px-3 rounded-lg bg-yellow-500 text-slate-950 font-black text-xs text-center uppercase tracking-wider";
+          document.getElementById('calc-mode-sprocket').className = "py-2.5 px-3 rounded-lg bg-slate-800 text-slate-300 font-bold text-xs text-center uppercase tracking-wider";
+          updateSprocketCalibration();
+        };
+      }
+
+      addLog("SprocketSync fully initialized. Ready for user gesture.", "text-emerald-400 font-bold");
+    }
+  </script>
 </body>
 </html>
