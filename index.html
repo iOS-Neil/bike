@@ -2,9 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Added viewport-fit=cover to allow the app to fill screen under iOS notches and status bars -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>SprocketSync GPS - Moto Dashboard V2</title>
   
+  <!-- ========================================== -->
+  <!-- NATIVE iOS PWA STANDALONE CONFIGURATION -->
+  <!-- ========================================== -->
+  <!-- Tells iOS to hide Safari search bar at the top and bottom navigation/URL bar entirely -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <!-- Sets the iOS status bar styling to blend beautifully with our dark layout -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SprocketSync">
+  
+  <!-- Inline manifest via data URL to enforce fullscreen standalone mode across modern platforms -->
+  <link rel="manifest" href='data:application/manifest+json,{"name":"SprocketSync","short_name":"SprocketSync","start_url":".","display":"standalone","background_color":"#05070f","theme_color":"#0f172a"}' />
+  <!-- ========================================== -->
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -22,6 +36,9 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       user-select: none;
       -webkit-user-select: none;
+      /* Safe padding for hardware curves (notch and home sweep indicator) */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
     }
     
     ::-webkit-scrollbar {
@@ -65,8 +82,8 @@
 </head>
 <body class="h-[100dvh] w-screen flex flex-col overflow-hidden bg-[#05070f]">
 
-  <!-- Core Header -->
-  <header class="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 z-50">
+  <!-- Core Header (Adjusted with iOS Safe Area dynamic top padding to fit under notch smoothly) -->
+  <header class="bg-slate-900 border-b border-slate-800 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 flex items-center justify-between shrink-0 z-50">
     <div class="flex items-center gap-2">
       <div class="w-8 h-8 rounded-lg bg-yellow-500 flex items-center justify-center">
         <i class="fa-solid fa-motorcycle text-slate-950"></i>
@@ -78,7 +95,7 @@
     </div>
     <div class="flex items-center gap-2">
       <!-- High Contrast GPS Lock Status Badge -->
-      <span id="gps-status" class="text-[10px] px-2.5 py-1 rounded bg-slate-950 border border-slate-850 text-slate-400 font-bold flex items-center gap-1.5 shadow">
+      <span id="gps-status" class="text-[10px] px-2.5 py-1 rounded bg-slate-950 border border-slate-855 text-slate-400 font-bold flex items-center gap-1.5 shadow">
         <span class="w-2 h-2 rounded-full bg-slate-600"></span> GPS OFF
       </span>
       <span id="simulation-badge" class="text-[10px] px-2.5 py-1 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-bold hidden">
@@ -166,7 +183,7 @@
         </div>
       </div>
 
-      <!-- NEW: Lean Angle IMU Sweep Meter -->
+      <!-- Lean Angle IMU Sweep Meter -->
       <div class="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-4 space-y-3 shadow-xl">
         <div class="flex justify-between items-center border-b border-slate-800/60 pb-2">
           <span class="text-xs font-black tracking-wider text-slate-300 uppercase flex items-center gap-2">
@@ -467,8 +484,8 @@
     <span id="toast-message">Testing active</span>
   </div>
 
-  <!-- Bottom Navigation Menu -->
-  <nav class="h-16 bg-slate-950 border-t border-slate-800 flex items-center justify-around shrink-0 z-[10000] px-2 shadow-inner">
+  <!-- Bottom Navigation Menu (Adjusted with safe area bottom inset to fit beautifully above virtual home indicators) -->
+  <nav class="h-[calc(4rem+env(safe-area-inset-bottom))] bg-slate-950 border-t border-slate-800 flex items-center justify-around shrink-0 z-[10000] px-2 pb-[env(safe-area-inset-bottom)] shadow-inner">
     <button id="nav-btn-cockpit" onclick="switchTab('tab-cockpit', 'nav-btn-cockpit')" class="flex-1 h-full flex flex-col items-center justify-center text-yellow-500 transition-colors">
       <i class="fa-solid fa-gauge text-xl pointer-events-none"></i>
       <span class="text-[10px] mt-1 font-bold pointer-events-none">Cockpit</span>
@@ -485,7 +502,6 @@
 
   <!-- Script logics -->
   <script>
-    // Global State Management
     const state = {
       isTracking: false,
       isSimulating: false,
@@ -506,7 +522,7 @@
         calibratedOffset: 0,
         peakLeft: 0,
         peakRight: 0,
-        posture: 'portrait' // handles dynamic posture correction
+        posture: 'portrait'
       },
       
       // Calibration config
@@ -582,7 +598,7 @@
           state.wakeLock = await navigator.wakeLock.request('screen');
           addLog("Wake Lock active. Smartphone display locked ON.", "text-emerald-400");
         } catch (err) {
-          addLog("Wake Lock unsupported on this client.", "text-slate-550");
+          addLog("Wake Lock API unsupported on this client.", "text-slate-555");
         }
       }
     }
@@ -627,21 +643,16 @@
     function handleOrientation(event) {
       let relativeRoll = 0;
       
-      // Determine orientation of landscape/portrait layout
       if (window.innerHeight > window.innerWidth) {
-        // Portrait mount
-        relativeRoll = event.gamma || 0; // Roll degree
+        relativeRoll = event.gamma || 0;
         state.imu.posture = 'portrait';
       } else {
-        // Landscape mount
-        relativeRoll = event.beta || 0; // Pitch takes over roll on rotation
+        relativeRoll = event.beta || 0;
         state.imu.posture = 'landscape';
       }
 
-      // Apply saved handlebars baseline calibration offset
       let finalLean = relativeRoll - state.imu.calibratedOffset;
 
-      // Handle raw roll boundaries over 180 degrees
       if (finalLean > 90) finalLean = 180 - finalLean;
       if (finalLean < -90) finalLean = -180 - finalLean;
 
@@ -653,7 +664,6 @@
       const lean = state.imu.rawLean;
       const absLean = Math.abs(Math.round(lean));
 
-      // Calculate new peaks
       if (lean < 0 && lean < state.imu.peakLeft) {
         state.imu.peakLeft = lean;
       } else if (lean > 0 && lean > state.imu.peakRight) {
@@ -669,16 +679,13 @@
       if (rightText) rightText.textContent = Math.round(state.imu.peakRight);
       if (curText) curText.textContent = absLean;
 
-      // Update visually sliders
       if (activeNeedle) {
-        // Map lean angle (-45 to 45) to slider width percents (0% to 100%)
-        let needlePercentage = 50 + (lean * 1.11); // scale visual sweep nicely
+        let needlePercentage = 50 + (lean * 1.11);
         if (needlePercentage < 2) needlePercentage = 2;
         if (needlePercentage > 98) needlePercentage = 98;
         activeNeedle.style.left = `${needlePercentage}%`;
       }
 
-      // Update Peak lines relative locations
       const leftLine = document.getElementById('lean-left-peak');
       const rightLine = document.getElementById('lean-right-peak');
       if (leftLine) {
@@ -690,26 +697,18 @@
         rightLine.style.left = `${Math.min(98, rightPercent)}%`;
       }
 
-      // Voice warn if they lean incredibly deep (safety alert)
       if (absLean > 42 && state.isTracking && Date.now() % 5000 < 100) {
         announceWithVoice("Alert. Deep lean limit reached.");
       }
     }
 
     function calibrateIMU() {
-      // Capture current physical angle as zero
-      let baseVal = 0;
-      if (window.innerHeight > window.innerWidth) {
-        baseVal = state.imu.rawLean + state.imu.calibratedOffset; // Portrait raw
-      } else {
-        baseVal = state.imu.rawLean + state.imu.calibratedOffset; // Landscape raw
-      }
-      
+      let baseVal = state.imu.rawLean + state.imu.calibratedOffset;
       state.imu.calibratedOffset = baseVal;
       state.imu.peakLeft = 0;
       state.imu.peakRight = 0;
       
-      addLog(`IMU calibrated. Dashboard zero established at ${baseVal.toFixed(1)}° inclination.`, "text-cyan-400 font-bold");
+      addLog(`IMU calibrated. Zero established at ${baseVal.toFixed(1)}° inclination.`, "text-cyan-400 font-bold");
       showToast("Gearing & Gyro Centered.");
     }
 
@@ -721,16 +720,15 @@
           const permissionState = await DeviceOrientationEvent.requestPermission();
           if (permissionState === 'granted') {
             window.addEventListener('deviceorientation', handleOrientation);
-            addLog("IMU integration unlocked. High-precision lean tracking active!", "text-emerald-400 font-bold");
+            addLog("IMU integration unlocked. Lean tracking active!", "text-emerald-400 font-bold");
             showToast("Gyro Scope Unlocked!");
           } else {
-            addLog("IMU hardware access denied by mobile user.", "text-rose-500");
+            addLog("IMU hardware access denied by user.", "text-rose-500");
           }
         } catch (err) {
           addLog(`iOS Sandbox blocked raw IMU calls: ${err.message}`, "text-slate-500");
         }
       } else {
-        // Fallback for non-iOS or desktop simulations
         window.addEventListener('deviceorientation', handleOrientation);
         addLog("Standard orientation listener active.", "text-cyan-400");
       }
@@ -794,7 +792,7 @@
 
         liveMarker = L.marker(defaultCenter, { icon: liveIcon }).addTo(map);
       } catch (err) {
-        addLog(`Map instantiation skipped: ${err.message}`, "text-slate-550");
+        addLog(`Map instantiation skipped: ${err.message}`, "text-slate-555");
       }
     }
 
@@ -830,7 +828,11 @@
     function updateMapPoints() {
       if (!map || !pathPolyline || state.pointsList.length === 0) return;
       try {
-        const latLngs = state.pointsList.map(p => [p.lat, p.lng]);
+        const latLngs = state.pointsList.map(p => {
+          const lat = p.lat !== undefined ? p.lat : p.latitude;
+          const lng = p.lng !== undefined ? p.lng : p.longitude;
+          return [lat, lng];
+        });
         pathPolyline.setLatLngs(latLngs);
         const lastPoint = latLngs[latLngs.length - 1];
         if (liveMarker) liveMarker.setLatLng(lastPoint);
@@ -840,6 +842,33 @@
       } catch (e) {
         console.warn("Map refresh skipped.");
       }
+    }
+
+    // INTELLIGENT COORDINATE SPEED RECOVERY SYSTEM (ICSRS)
+    function getMilestoneSpeed(m, ridePath) {
+      if (m.speed !== undefined && m.speed !== null && !isNaN(m.speed)) {
+        return m.speed;
+      }
+      if (!ridePath || ridePath.length === 0) return null;
+      
+      let closestPoint = null;
+      let minDistance = Infinity;
+      const mLat = m.lat !== undefined ? m.lat : m.latitude;
+      const mLng = m.lng !== undefined ? m.lng : m.longitude;
+      
+      for (const p of ridePath) {
+        const pLat = p.lat !== undefined ? p.lat : p.latitude;
+        const pLng = p.lng !== undefined ? p.lng : p.longitude;
+        const d = getDistance(mLat, mLng, pLat, pLng);
+        if (d < minDistance) {
+          minDistance = d;
+          closestPoint = p;
+        }
+      }
+      if (closestPoint && closestPoint.speed !== undefined) {
+        return closestPoint.speed;
+      }
+      return null;
     }
 
     function checkAndDropMilestones(newPoint) {
@@ -854,8 +883,8 @@
       if (currentMilestoneIndex > 0 && currentMilestoneIndex > state.milestones.length) {
         const milestoneObj = {
           number: currentMilestoneIndex,
-          lat: newPoint.lat,
-          lng: newPoint.lng,
+          lat: newPoint.lat !== undefined ? newPoint.lat : newPoint.latitude,
+          lng: newPoint.lng !== undefined ? newPoint.lng : newPoint.longitude,
           speed: state.currentSpeed 
         };
 
@@ -941,7 +970,7 @@
 
         buildConversionCheatSheet();
       } catch (err) {
-        console.warn("Calibration calculations mathematical overflow.");
+        console.warn("Calibration calculation math errored.");
       }
     }
 
@@ -999,11 +1028,9 @@
           : state.distance * 0.001; 
         document.getElementById('txt-distance').textContent = distanceDisplay.toFixed(2);
 
-        // Dynamically size progress indicator bar (0 - 100 mph bounds)
         const indicatorWidth = Math.min(100, Math.max(0, (displaySpeed / 100) * 100));
         document.getElementById('speed-indicator-bar').style.width = `${indicatorWidth}%`;
 
-        // Check speed threshold limit alerting
         const speedometerCard = document.getElementById('speedometer-card');
         if (displaySpeed >= state.speedAlertVal) {
           speedometerCard.classList.add('speed-alarm-flash');
@@ -1027,13 +1054,11 @@
       const durationEl = document.getElementById('txt-duration');
       if (durationEl) durationEl.textContent = formatTime(state.elapsedTime);
 
-      // Perform a safety background checkpoint write every 10 seconds
       if (state.elapsedTime % 10 === 0) {
         saveActiveStateToMemory();
       }
     }
 
-    // Auto-Recovery mechanics
     function saveActiveStateToMemory() {
       if (!state.isTracking) return;
       
@@ -1051,6 +1076,14 @@
       localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(autosaveData));
     }
 
+    function checkPreviousRideRecovery() {
+      const stored = localStorage.getItem(AUTO_SAVE_KEY);
+      if (stored) {
+        document.getElementById('recovery-bar').classList.remove('hidden');
+      }
+    }
+
+    // iOS Fullscreen helper to let user bypass dynamic browser UI issues
     function checkPreviousRideRecovery() {
       const stored = localStorage.getItem(AUTO_SAVE_KEY);
       if (stored) {
@@ -1080,12 +1113,10 @@
 
         addLog("Auto-Recovery completed! Ride session telemetry restored safely.", "text-emerald-400 font-bold");
         
-        // Redraw historical map coordinates
         if (map && state.pointsList.length > 0) {
           updateMapPoints();
         }
 
-        // Re-establish tracking parameters
         state.intervalId = setInterval(runTimer, 1000);
         
         if (state.isSimulating) {
@@ -1244,6 +1275,7 @@
       }
     }
 
+    // Toggle back real GPS tracking
     function stopRealGPS() {
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
@@ -1271,7 +1303,6 @@
         const currentLng = startPos.lng + (endPos.lng - startPos.lng) * fraction;
         const currentSpeed = startPos.speed + (endPos.speed - startPos.speed) * fraction;
         
-        // Also simulate physical lean angles on corner entries
         const startLean = startPos.lean || 0;
         const endLean = endPos.lean || 0;
         state.imu.rawLean = startLean + (endLean - startLean) * fraction;
@@ -1336,7 +1367,6 @@
           state.milestones = [];
           state.lastPosition = null;
 
-          // Clear peaks
           state.imu.peakLeft = 0;
           state.imu.peakRight = 0;
 
@@ -1361,7 +1391,6 @@
           requestWakeLock();
           announceWithVoice("Starting ride tracker.");
 
-          // Request Orientation permission automatically when ride starts
           requestIMUAccess();
 
           state.intervalId = setInterval(runTimer, 1000);
@@ -1393,7 +1422,6 @@
 
           releaseWakeLock();
           
-          // Clear active auto-save record on successful completion
           localStorage.removeItem(AUTO_SAVE_KEY);
 
           addLog(`Ride tracking finalized. Total distance run: ${ (state.distance * 0.000621371).toFixed(2) } mi. Top speed: ${state.topSpeed.toFixed(1)} mph. Max Left Lean: ${Math.abs(Math.round(state.imu.peakLeft))}° | Max Right Lean: ${Math.round(state.imu.peakRight)}°`, "text-emerald-400 font-bold");
@@ -1512,11 +1540,16 @@
                 <i class="fa-solid fa-circle-info text-yellow-500"></i> Milestone Speeds:
               </span>
               <div class="flex flex-wrap gap-1.5">
-                ${ride.milestones.map(m => `
-                  <span class="bg-slate-900 border border-slate-800 text-[10px] py-1 px-2 rounded font-mono text-slate-300">
-                    Mile ${m.number}: <strong class="text-yellow-500">${Math.round(m.speed)} ${speedUnit}</strong>
-                  </span>
-                `).join('')}
+                ${ride.milestones.map(m => {
+                  // ICSRS Recovery logic applied here to historical cards
+                  const speedVal = getMilestoneSpeed(m, ride.path);
+                  const displaySpeed = (speedVal !== null && !isNaN(speedVal)) ? Math.round(speedVal) : '--';
+                  return `
+                    <span class="bg-slate-900 border border-slate-800 text-[10px] py-1 px-2 rounded font-mono text-slate-300">
+                      Mile ${m.number}: <strong class="text-yellow-500">${displaySpeed} ${speedUnit}</strong>
+                    </span>
+                  `;
+                }).join('')}
               </div>
             </div>
           ` : ''}
@@ -1571,11 +1604,19 @@
           mapMarkersList = [];
           pathPolyline.setLatLngs([]);
 
-          if (selected.path && selected.path.length > 0) {
-            const latLngs = selected.path.map(p => [p.lat, p.lng]);
+          const selectedPath = selected.path || [];
+          if (selectedPath.length > 0) {
+            const latLngs = selectedPath.map(p => {
+              const pLat = p.lat !== undefined ? p.lat : p.latitude;
+              const pLng = p.lng !== undefined ? p.lng : p.longitude;
+              return [pLat, pLng];
+            });
             pathPolyline.setLatLngs(latLngs);
             
             selected.milestones.forEach(m => {
+              const mLat = m.lat !== undefined ? m.lat : m.latitude;
+              const mLng = m.lng !== undefined ? m.lng : m.longitude;
+
               const customIcon = L.divIcon({
                 className: 'mile-marker',
                 html: `<span>${m.number}</span>`,
@@ -1583,8 +1624,12 @@
                 iconAnchor: [12, 12]
               });
               
+              // ICSRS Recovery logic applied to Map popups
+              const speedVal = getMilestoneSpeed(m, selectedPath);
+              const displaySpeed = (speedVal !== null && !isNaN(speedVal)) ? Math.round(speedVal) : '--';
               const unitText = state.unit === 'mph' ? 'mph' : 'km/h';
-              const marker = L.marker([m.lat, m.lng], { icon: customIcon })
+
+              const marker = L.marker([mLat, mLng], { icon: customIcon })
                 .addTo(map)
                 .bindPopup(`
                   <div class="text-xs font-sans text-slate-100">
@@ -1592,7 +1637,7 @@
                       Milestone ${m.number} (Reloaded)
                     </p>
                     <div class="flex items-baseline gap-1 mt-0.5">
-                      <span class="text-lg font-extrabold text-white">${Math.round(m.speed)}</span>
+                      <span class="text-lg font-extrabold text-white">${displaySpeed}</span>
                       <span class="text-slate-400 font-semibold">${unitText}</span>
                     </div>
                   </div>
@@ -1731,19 +1776,14 @@
       updateSprocketCalibration();
       buildHistoryList();
 
-      // Check if there is an unsaved ride session to restore
       checkPreviousRideRecovery();
-
-      // Run diagnostics instantly
       runContextDiagnostic();
 
-      // Bind gyroscope hardware trigger button
       const btnIMU = document.getElementById('btn-request-imu');
       if (btnIMU) {
         btnIMU.onclick = requestIMUAccess;
       }
 
-      // Bind speed threshold slider
       const speedRange = document.getElementById('alert-speed-range');
       if (speedRange) {
         speedRange.oninput = function() {
