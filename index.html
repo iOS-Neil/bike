@@ -15,8 +15,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ApexMoto">
   
+  <!-- Premium Native iOS Home Screen App Icon (Sleek default Vector banking motorcycle logo) -->
+  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'><rect width='512' height='512' rx='128' fill='%2305070f'/><rect x='16' y='16' width='480' height='480' rx='112' fill='none' stroke='%231e293b' stroke-width='8'/><path d='M100 360 C150 160 362 160 412 360' fill='none' stroke='%2322d3ee' stroke-width='24' stroke-linecap='round'/><g transform='translate(256, 210) rotate(-20)'><circle cx='-50' cy='30' r='25' fill='none' stroke='%23facc15' stroke-width='10'/><circle cx='50' cy='30' r='25' fill='none' stroke='%23facc15' stroke-width='10'/><path d='M-50 30 L0 -30 L50 30 Z' fill='none' stroke='%23facc15' stroke-width='10' stroke-linejoin='round'/><circle cx='0' cy='-50' r='16' fill='%23facc15'/></g><text x='256' y='440' font-family='sans-serif' font-weight='900' font-size='38' fill='%23facc15' text-anchor='middle' letter-spacing='3'>APEXMOTO</text></svg>">
+
   <!-- Inline manifest via data URL to enforce fullscreen standalone mode across modern platforms -->
-  <link rel="manifest" href='data:application/manifest+json,{"name":"ApexMoto Telemetry","short_name":"ApexMoto","start_url":".","display":"standalone","background_color":"#05070f","theme_color":"#0f172a"}' />
+  <link rel="manifest" href='data:application/manifest+json,{"name":"ApexMoto Telemetry","short_name":"ApexMoto","start_url":".","display":"standalone","background_color":"#05070f","theme_color":"#0f172a","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=\x27http://www.w3.org/2000/svg\x27 viewBox=\x270 0 512 512\x27><rect width=\x27512\x27 height=\x27512\x27 rx=\x27128\x27 fill=\x27%2305070f\x27/><path d=\x27M100 360 C150 160 362 160 412 360\x27 fill=\x27none\x27 stroke=\x27%2322d3ee\x27 stroke-width=\x2724\x27 stroke-linecap=\x27round\x27/><g transform=\x27translate(256, 210) rotate(-20)\x27><circle cx=\x27-50\x27 cy=\x2730\x27 r=\x2725\x27 fill=\x27none\x27 stroke=\x27%23facc15\x27 stroke-width=\x2710\x27/><circle cx=\x2750\x27 cy=\x2730\x27 r=\x2725\x27 fill=\x27none\x27 stroke=\x27%23facc15\x27 stroke-width=\x2710\x27/><path d=\x27M-50 30 L0 -30 L50 30 Z\x27 fill=\x27none\x27 stroke=\x27%23facc15\x27 stroke-width=\x2710\x27/><circle cx=\x270\x27 cy=\x27-50\x27 r=\x2716\x27 fill=\x27%23facc15\x27/></g></svg>","sizes":"512x512","type":"image/svg+xml"}]}' />
   <!-- ========================================== -->
 
   <!-- Tailwind CSS -->
@@ -665,6 +668,7 @@
     }
 
     // Dynamic lean estimation from standard mobile sensors
+    // Dynamic lean estimation from standard mobile sensors
     function handleOrientation(event) {
       let relativeRoll = 0;
       
@@ -1108,14 +1112,6 @@
       }
     }
 
-    // iOS Fullscreen helper to let user bypass dynamic browser UI issues
-    function checkPreviousRideRecovery() {
-      const stored = localStorage.getItem(AUTO_SAVE_KEY);
-      if (stored) {
-        document.getElementById('recovery-bar').classList.remove('hidden');
-      }
-    }
-
     function recoverPreviousRide() {
       try {
         const stored = localStorage.getItem(AUTO_SAVE_KEY);
@@ -1305,7 +1301,7 @@
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
-        addLog("GPS satellite hardware tracker disabled.", "text-slate-500");
+        addLog("GPS satellite hardware tracker disabled.", "text-slate-555");
       }
       updateGPSBadgeStatus("OFF");
     }
@@ -1373,7 +1369,7 @@
         clearTimeout(simTimerId);
         simTimerId = null;
       }
-      addLog("Simulation engine deactivated.", "text-slate-500");
+      addLog("Simulation engine deactivated.", "text-slate-555");
       const badge = document.getElementById('simulation-badge');
       if (badge) badge.classList.add('hidden');
       updateGPSBadgeStatus();
@@ -1755,6 +1751,7 @@
       }
     }
 
+    // Dismiss custom iOS standalone banner
     function dismissPwaPrompt() {
       const prompt = document.getElementById('ios-pwa-prompt');
       if (prompt) {
