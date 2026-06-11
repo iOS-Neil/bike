@@ -15,8 +15,76 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ApexMoto">
   
-  <!-- Premium Native iOS Home Screen App Icon (Sleek default Vector banking motorcycle logo) -->
-  <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'><rect width='512' height='512' rx='128' fill='%2305070f'/><rect x='16' y='16' width='480' height='480' rx='112' fill='none' stroke='%231e293b' stroke-width='8'/><path d='M100 360 C150 160 362 160 412 360' fill='none' stroke='%2322d3ee' stroke-width='24' stroke-linecap='round'/><g transform='translate(256, 210) rotate(-20)'><circle cx='-50' cy='30' r='25' fill='none' stroke='%23facc15' stroke-width='10'/><circle cx='50' cy='30' r='25' fill='none' stroke='%23facc15' stroke-width='10'/><path d='M-50 30 L0 -30 L50 30 Z' fill='none' stroke='%23facc15' stroke-width='10' stroke-linejoin='round'/><circle cx='0' cy='-50' r='16' fill='%23facc15'/></g><text x='256' y='440' font-family='sans-serif' font-weight='900' font-size='38' fill='%23facc15' text-anchor='middle' letter-spacing='3'>APEXMOTO</text></svg>">
+  <!-- Premium Native iOS Home Screen App Icon (Standard PNG target link) -->
+  <link rel="apple-touch-icon" id="apple-touch-icon" href="">
+
+  <script>
+    // iOS Safari does not support SVG for apple-touch-icon.
+    // This script dynamically renders a beautiful high-res PNG on load so iOS displays it correctly on the Home Screen.
+    (function() {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 180;
+        canvas.height = 180;
+        const ctx = canvas.getContext('2d');
+        
+        // 1. Draw premium gradient background
+        const grad = ctx.createLinearGradient(0, 0, 180, 180);
+        grad.addColorStop(0, '#0f172a');
+        grad.addColorStop(1, '#05070f');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 180, 180);
+        
+        // 2. Draw glowing cyan tracking border
+        ctx.strokeStyle = '#22d3ee';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(90, 90, 80, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 3. Draw inner yellow banking line (simulating clean lean)
+        ctx.strokeStyle = '#eab308';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(90, 95, 40, Math.PI * 0.8, Math.PI * 2.2);
+        ctx.stroke();
+
+        // 4. Draw golden aerodynamics motorcycle shield
+        ctx.fillStyle = '#eab308';
+        ctx.beginPath();
+        ctx.moveTo(90, 42);  // Windscreen apex
+        ctx.lineTo(65, 80);  // Left wing
+        ctx.lineTo(75, 110); // Left bottom panel
+        ctx.lineTo(90, 125); // Center line
+        ctx.lineTo(105, 110);// Right bottom panel
+        ctx.lineTo(115, 80); // Right wing
+        ctx.closePath();
+        ctx.fill();
+
+        // 5. Tech details on fairing
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(80, 75, 3.5, 0, Math.PI * 2);
+        ctx.arc(100, 75, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 6. Draw clean structural text "APEX"
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '900 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('APEXMOTO', 90, 150);
+
+        // 7. Extract PNG and assign to apple-touch-icon link
+        const link = document.getElementById('apple-touch-icon');
+        if (link) {
+          link.href = canvas.toDataURL('image/png');
+        }
+      } catch (e) {
+        console.error('PWA touch icon generation failure:', e);
+      }
+    })();
+  </script>
 
   <!-- Inline manifest via data URL to enforce fullscreen standalone mode across modern platforms -->
   <link rel="manifest" href='data:application/manifest+json,{"name":"ApexMoto Telemetry","short_name":"ApexMoto","start_url":".","display":"standalone","background_color":"#05070f","theme_color":"#0f172a","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=\x27http://www.w3.org/2000/svg\x27 viewBox=\x270 0 512 512\x27><rect width=\x27512\x27 height=\x27512\x27 rx=\x27128\x27 fill=\x27%2305070f\x27/><path d=\x27M100 360 C150 160 362 160 412 360\x27 fill=\x27none\x27 stroke=\x27%2322d3ee\x27 stroke-width=\x2724\x27 stroke-linecap=\x27round\x27/><g transform=\x27translate(256, 210) rotate(-20)\x27><circle cx=\x27-50\x27 cy=\x2730\x27 r=\x2725\x27 fill=\x27none\x27 stroke=\x27%23facc15\x27 stroke-width=\x2710\x27/><circle cx=\x2750\x27 cy=\x2730\x27 r=\x2725\x27 fill=\x27none\x27 stroke=\x27%23facc15\x27 stroke-width=\x2710\x27/><path d=\x27M-50 30 L0 -30 L50 30 Z\x27 fill=\x27none\x27 stroke=\x27%23facc15\x27 stroke-width=\x2710\x27/><circle cx=\x270\x27 cy=\x27-50\x27 r=\x2716\x27 fill=\x27%23facc15\x27/></g></svg>","sizes":"512x512","type":"image/svg+xml"}]}' />
