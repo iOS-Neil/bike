@@ -2,25 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <!-- Added viewport-fit=cover to allow the app to fill screen under iOS notches and status bars -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ApexMoto GPS - Telemetry Dashboard</title>
   
   <!-- ========================================== -->
   <!-- NATIVE iOS PWA STANDALONE CONFIGURATION -->
   <!-- ========================================== -->
-  <!-- Tells iOS to hide Safari search bar at the top and bottom navigation/URL bar entirely -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <!-- Sets the iOS status bar styling to blend beautifully with our dark layout -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ApexMoto">
   
-  <!-- Premium Native iOS Home Screen App Icon (Standard PNG target link) -->
+  <!-- Premium Native iOS Home Screen App Icon Target Link -->
   <link rel="apple-touch-icon" id="apple-touch-icon" href="">
 
   <script>
-    // iOS Safari does not support SVG for apple-touch-icon.
-    // This script dynamically renders a beautiful high-res PNG on load so iOS displays it correctly on the Home Screen.
     (function() {
       try {
         const canvas = document.createElement('canvas');
@@ -28,54 +23,97 @@
         canvas.height = 180;
         const ctx = canvas.getContext('2d');
         
-        // 1. Draw premium gradient background
-        const grad = ctx.createLinearGradient(0, 0, 180, 180);
-        grad.addColorStop(0, '#0f172a');
-        grad.addColorStop(1, '#05070f');
-        ctx.fillStyle = grad;
+        // 1. Draw premium solid bright gold-yellow background
+        ctx.fillStyle = '#facc15';
         ctx.fillRect(0, 0, 180, 180);
         
-        // 2. Draw glowing cyan tracking border
-        ctx.strokeStyle = '#22d3ee';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(90, 90, 80, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 3. Draw inner yellow banking line (simulating clean lean)
-        ctx.strokeStyle = '#eab308';
-        ctx.lineWidth = 5;
+        // 2. Draw a stylized sleek black racing motorcycle profile
+        ctx.fillStyle = '#05070f';
+        ctx.strokeStyle = '#05070f';
         ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Rear Wheel
+        ctx.lineWidth = 8;
         ctx.beginPath();
-        ctx.arc(90, 95, 40, Math.PI * 0.8, Math.PI * 2.2);
+        ctx.arc(52, 112, 18, 0, Math.PI * 2);
         ctx.stroke();
 
-        // 4. Draw golden aerodynamics motorcycle shield
-        ctx.fillStyle = '#eab308';
+        // Front Wheel
         ctx.beginPath();
-        ctx.moveTo(90, 42);  // Windscreen apex
-        ctx.lineTo(65, 80);  // Left wing
-        ctx.lineTo(75, 110); // Left bottom panel
-        ctx.lineTo(90, 125); // Center line
-        ctx.lineTo(105, 110);// Right bottom panel
-        ctx.lineTo(115, 80); // Right wing
-        ctx.closePath();
+        ctx.arc(128, 112, 18, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner Hubs
+        ctx.fillStyle = '#05070f';
+        ctx.beginPath();
+        ctx.arc(52, 112, 5, 0, Math.PI * 2);
+        ctx.arc(128, 112, 5, 0, Math.PI * 2);
         ctx.fill();
 
-        // 5. Tech details on fairing
-        ctx.fillStyle = '#0f172a';
+        // Rear Swingarm & Chain Stay
+        ctx.lineWidth = 5;
         ctx.beginPath();
-        ctx.arc(80, 75, 3.5, 0, Math.PI * 2);
-        ctx.arc(100, 75, 3.5, 0, Math.PI * 2);
+        ctx.moveTo(52, 112);
+        ctx.lineTo(82, 110);
+        ctx.stroke();
+
+        // Front Forks & Steering Column
+        ctx.beginPath();
+        ctx.moveTo(128, 112);
+        ctx.lineTo(108, 68); // Fork apex
+        ctx.stroke();
+
+        // Handlebars
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(108, 68);
+        ctx.lineTo(96, 68); // Handlebar grip
+        ctx.stroke();
+
+        // Main Frame & Sleek Tank Cowl
+        ctx.beginPath();
+        ctx.moveTo(82, 110); // Swingarm pivot
+        ctx.lineTo(65, 84);  // Subframe under seat
+        ctx.lineTo(92, 82);  // Gas tank rear
+        ctx.bezierCurveTo(102, 72, 112, 72, 115, 84); // Gas tank hump
+        ctx.lineTo(108, 68); // To steering head
+        ctx.lineTo(92, 88);  // Engine bay frame top
+        ctx.lineTo(82, 110);
         ctx.fill();
 
-        // 6. Draw clean structural text "APEX"
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '900 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('APEXMOTO', 90, 150);
+        // Seat Cowl / Sport Tail Unit
+        ctx.beginPath();
+        ctx.moveTo(65, 84);
+        ctx.lineTo(44, 80);  // Tail point
+        ctx.lineTo(52, 94);  // Tail lower section
+        ctx.lineTo(65, 84);
+        ctx.fill();
 
-        // 7. Extract PNG and assign to apple-touch-icon link
+        // Front Cowling / Windscreen Area
+        ctx.beginPath();
+        ctx.moveTo(115, 84);
+        ctx.lineTo(124, 76); // Front headlight nose
+        ctx.lineTo(112, 63); // Windshield tip
+        ctx.lineTo(108, 68);
+        ctx.fill();
+
+        // Engine Under-cowl / Fairing
+        ctx.beginPath();
+        ctx.moveTo(82, 110);
+        ctx.lineTo(94, 115); // Belly pan rear
+        ctx.lineTo(114, 102); // Belly pan front
+        ctx.lineTo(104, 88);  // Engine mid
+        ctx.fill();
+
+        // Sleek Sport Exhaust
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(76, 111);
+        ctx.lineTo(44, 100); // Exhaust tip pointing up-back
+        ctx.stroke();
+
+        // Extract PNG and assign to apple-touch-icon link
         const link = document.getElementById('apple-touch-icon');
         if (link) {
           link.href = canvas.toDataURL('image/png');
@@ -87,8 +125,7 @@
   </script>
 
   <!-- Inline manifest via data URL to enforce fullscreen standalone mode across modern platforms -->
-  <link rel="manifest" href='data:application/manifest+json,{"name":"ApexMoto Telemetry","short_name":"ApexMoto","start_url":".","display":"standalone","background_color":"#05070f","theme_color":"#0f172a","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=\x27http://www.w3.org/2000/svg\x27 viewBox=\x270 0 512 512\x27><rect width=\x27512\x27 height=\x27512\x27 rx=\x27128\x27 fill=\x27%2305070f\x27/><path d=\x27M100 360 C150 160 362 160 412 360\x27 fill=\x27none\x27 stroke=\x27%2322d3ee\x27 stroke-width=\x2724\x27 stroke-linecap=\x27round\x27/><g transform=\x27translate(256, 210) rotate(-20)\x27><circle cx=\x27-50\x27 cy=\x2730\x27 r=\x2725\x27 fill=\x27none\x27 stroke=\x27%23facc15\x27 stroke-width=\x2710\x27/><circle cx=\x2750\x27 cy=\x2730\x27 r=\x2725\x27 fill=\x27none\x27 stroke=\x27%23facc15\x27 stroke-width=\x2710\x27/><path d=\x27M-50 30 L0 -30 L50 30 Z\x27 fill=\x27none\x27 stroke=\x27%23facc15\x27 stroke-width=\x2710\x27/><circle cx=\x270\x27 cy=\x27-50\x27 r=\x2716\x27 fill=\x27%23facc15\x27/></g></svg>","sizes":"512x512","type":"image/svg+xml"}]}' />
-  <!-- ========================================== -->
+  <link rel="manifest" href='data:application/manifest+json,{"name":"ApexMoto Telemetry","short_name":"ApexMoto","start_url":".","display":"standalone","background_color":"#05070f","theme_color":"#0f172a","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=\x27http://www.w3.org/2000/svg\x27 viewBox=\x270 0 512 512\x27><rect width=\x27512\x27 height=\x27512\x27 rx=\x27128\x27 fill=\x27%23facc15\x27/><g transform=\x27translate(100, 100) scale(1.8)\x27><circle cx=\x2730\x27 cy=\x2760\x27 r=\x2711\x27 fill=\x27none\x27 stroke=\x27%2305070f\x27 stroke-width=\x275\x27/><circle cx=\x2770\x27 cy=\x2760\x27 r=\x2711\x27 fill=\x27none\x27 stroke=\x27%2305070f\x27 stroke-width=\x275\x27/><path d=\x27M30 60 L45 35 L62 35 L70 60 L58 35 M45 35 L48 50 L58 50\x27 fill=\x27none\x27 stroke=\x27%2305070f\x27 stroke-width=\x274\x27 stroke-linecap=\x27round\x27/></g></svg>","sizes":"512x512","type":"image/svg+xml"}]}' />
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -101,14 +138,23 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <style>
-    body {
-      background-color: #05070f;
+    /* Absolute fixed reset to completely eradicate any iOS margins or viewport shrinking */
+    html, body {
+      height: 100% !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background-color: #05070f !important;
+      overflow: hidden !important;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
       color: #e2e8f0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       user-select: none;
       -webkit-user-select: none;
-      margin: 0;
-      padding: 0;
     }
     
     ::-webkit-scrollbar {
@@ -134,12 +180,10 @@
       box-shadow: 0 0 8px rgba(0,0,0,0.5);
     }
 
-    /* Lean sweep gauge dynamic elements */
     .lean-needle {
       transition: transform 0.1s cubic-bezier(0.1, 0.8, 0.3, 1);
     }
     
-    /* Subtle alarm glow */
     .speed-alarm-flash {
       animation: alert-pulse 1s infinite alternate;
     }
@@ -150,9 +194,9 @@
     }
   </style>
 </head>
-<body class="h-[100dvh] w-screen flex flex-col overflow-hidden bg-[#05070f]">
+<body class="w-full h-full flex flex-col bg-[#05070f]">
 
-  <!-- Core Header (Adjusted with iOS Safe Area dynamic top padding to fit under notch smoothly) -->
+  <!-- Core Header (Stretches all the way to absolute top beneath iOS Status Bar) -->
   <header class="bg-slate-900 border-b border-slate-800 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 flex items-center justify-between shrink-0 z-50">
     <div class="flex items-center gap-2">
       <div class="w-8 h-8 rounded-lg bg-yellow-500 flex items-center justify-center">
@@ -164,8 +208,7 @@
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <!-- High Contrast GPS Lock Status Badge -->
-      <span id="gps-status" class="text-[10px] px-2.5 py-1 rounded bg-slate-950 border border-slate-855 text-slate-400 font-bold flex items-center gap-1.5 shadow">
+      <span id="gps-status" class="text-[10px] px-2.5 py-1 rounded bg-slate-950 border border-slate-850 text-slate-400 font-bold flex items-center gap-1.5 shadow">
         <span class="w-2 h-2 rounded-full bg-slate-600"></span> GPS OFF
       </span>
       <span id="simulation-badge" class="text-[10px] px-2.5 py-1 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-bold hidden">
@@ -206,7 +249,6 @@
             </button>
           </div>
         </div>
-        <!-- Terminal event log outputs -->
         <div id="diagnostic-terminal" class="font-mono text-[10px] text-slate-300 space-y-1 max-h-24 overflow-y-auto p-2 bg-[#04060b] rounded border border-slate-900">
           <div class="text-slate-500">[SYSTEM] ApexMoto Pro active...</div>
           <div class="text-slate-500">[SYSTEM] System secure origin: HTTPS detected.</div>
@@ -217,7 +259,6 @@
       <!-- Speedometer Gauge Card -->
       <div id="speedometer-card" class="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 p-6 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
         
-        <!-- Live RPM/Speed Bar graphic across the top -->
         <div class="absolute top-0 left-0 right-0 h-1.5 bg-slate-800">
           <div id="speed-indicator-bar" class="h-full bg-gradient-to-r from-emerald-500 via-yellow-500 to-rose-600 transition-all duration-300" style="width: 0%"></div>
         </div>
@@ -233,13 +274,11 @@
 
         <span class="text-xs tracking-widest font-bold text-slate-400 mt-2">CURRENT SPEED</span>
         
-        <!-- Big Digits Speed Display -->
         <div class="flex items-baseline my-3">
           <span id="txt-speed" class="text-7xl font-black font-mono tracking-tighter text-yellow-500 drop-shadow-[0_0_15px_rgba(234,179,8,0.2)]">0</span>
           <span class="text-slate-400 font-bold ml-1 text-lg" id="txt-unit-label">mph</span>
         </div>
 
-        <!-- Corrected Speed Cheat-Indicator -->
         <div class="w-full mt-2 pt-3 border-t border-slate-800/60 text-center flex justify-around items-center gap-4">
           <div>
             <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Raw GPS</div>
@@ -264,24 +303,16 @@
           </button>
         </div>
 
-        <!-- Lean sweep slider gauge visualizer -->
         <div class="relative py-4 flex flex-col items-center">
           <div class="w-full h-2 bg-slate-950 rounded-full relative overflow-visible border border-slate-800">
-            <!-- Left limits -->
             <div class="absolute left-1/4 top-0 bottom-0 w-[2px] bg-rose-500/40"></div>
-            <!-- Right limits -->
             <div class="absolute right-1/4 top-0 bottom-0 w-[2px] bg-rose-500/40"></div>
-            <!-- Dynamic Left Peak line -->
             <div id="lean-left-peak" class="absolute h-4 w-[2px] bg-yellow-500 -top-1" style="left: 50%;"></div>
-            <!-- Dynamic Right Peak line -->
             <div id="lean-right-peak" class="absolute h-4 w-[2px] bg-yellow-500 -top-1" style="left: 50%;"></div>
-            <!-- Center line -->
             <div class="absolute left-1/2 top-0 bottom-0 w-[2px] bg-slate-500"></div>
-            <!-- Active needle marker -->
             <div id="lean-active-needle" class="absolute h-6 w-1 bg-cyan-400 rounded-full -top-2 left-1/2 transform -translate-x-1/2 lean-needle"></div>
           </div>
 
-          <!-- Dynamic sweep numbers -->
           <div class="w-full flex justify-between text-[10px] text-slate-500 mt-2 font-mono">
             <span>45° LEFT</span>
             <span>0° CENTER</span>
@@ -289,7 +320,6 @@
           </div>
         </div>
 
-        <!-- Stats columns -->
         <div class="grid grid-cols-3 gap-2 text-center pt-2 border-t border-slate-800/60">
           <div>
             <div class="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Peak Left</div>
@@ -397,11 +427,9 @@
             <i class="fa-solid fa-map-location-dot text-yellow-500"></i> LIVE ROUTE MAP
           </span>
           <div class="flex gap-1.5 items-center">
-            <!-- Map centering toggle -->
             <button id="btn-toggle-center" onclick="toggleMapCenterLock()" class="text-[9px] px-2 py-1 rounded bg-yellow-500 text-slate-950 font-black uppercase shadow">
               <i class="fa-solid fa-lock"></i> Auto-Center
             </button>
-            <!-- Map theme layer toggle -->
             <button id="btn-toggle-theme" onclick="toggleMapTheme()" class="text-[9px] px-2 py-1 rounded bg-slate-800 text-slate-300 font-bold uppercase">
               Dark Map
             </button>
@@ -549,12 +577,12 @@
   </div>
 
   <!-- User Action Toast -->
-  <div id="toast-notification" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-slate-900 border-2 border-yellow-500 text-slate-100 text-xs font-bold px-4 py-3 rounded-xl shadow-2xl z-[99999] opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2 max-w-[90%]">
+  <div id="toast-notification" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-900 border-2 border-yellow-500 text-slate-100 text-xs font-bold px-4 py-3 rounded-xl shadow-2xl z-[99999] opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-2 max-w-[90%]">
     <i class="fa-solid fa-circle-info text-yellow-500"></i>
     <span id="toast-message">Testing active</span>
   </div>
 
-  <!-- iOS Add to Home Screen Prompt Overlay (Shown only to non-standalone iOS users) -->
+  <!-- iOS Add to Home Screen Prompt Overlay -->
   <div id="ios-pwa-prompt" class="fixed bottom-24 left-4 right-4 bg-slate-950 border-2 border-cyan-500 rounded-2xl p-4 shadow-2xl z-[99999] transition-all duration-500 transform translate-y-32 opacity-0 pointer-events-none flex flex-col gap-2 max-w-xl mx-auto">
     <div class="flex justify-between items-start">
       <div class="flex items-center gap-2">
@@ -579,8 +607,8 @@
     </div>
   </div>
 
-  <!-- Bottom Navigation Menu (Adjusted with safe area bottom inset to fit beautifully above virtual home indicators) -->
-  <nav class="h-[calc(4rem+env(safe-area-inset-bottom))] bg-slate-950 border-t border-slate-800 flex items-center justify-around shrink-0 z-[10000] px-2 pb-[env(safe-area-inset-bottom)] shadow-inner">
+  <!-- Bottom Navigation Menu (Adjusted with safe area bottom inset) -->
+  <nav class="h-[calc(4.25rem+env(safe-area-inset-bottom))] bg-slate-950 border-t border-slate-800 flex items-center justify-around shrink-0 z-[10000] px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-inner">
     <button id="nav-btn-cockpit" onclick="switchTab('tab-cockpit', 'nav-btn-cockpit')" class="flex-1 h-full flex flex-col items-center justify-center text-yellow-500 transition-colors">
       <i class="fa-solid fa-gauge text-xl pointer-events-none"></i>
       <span class="text-[10px] mt-1 font-bold pointer-events-none">Cockpit</span>
@@ -734,8 +762,6 @@
       }
     }
 
-    // Dynamic lean estimation from standard mobile sensors
-    // Dynamic lean estimation from standard mobile sensors
     function handleOrientation(event) {
       let relativeRoll = 0;
       
@@ -940,7 +966,6 @@
       }
     }
 
-    // INTELLIGENT COORDINATE SPEED RECOVERY SYSTEM (ICSRS)
     function getMilestoneSpeed(m, ridePath) {
       if (m.speed !== undefined && m.speed !== null && !isNaN(m.speed)) {
         return m.speed;
@@ -1227,7 +1252,7 @@
     function discardPreviousRide() {
       localStorage.removeItem(AUTO_SAVE_KEY);
       document.getElementById('recovery-bar').classList.add('hidden');
-      addLog("Previous incomplete ride discarded.", "text-slate-500");
+      addLog("Previous incomplete ride discarded.", "text-slate-555");
     }
 
     function updateGPSBadgeStatus(customStatus = "") {
@@ -1363,7 +1388,6 @@
       }
     }
 
-    // Toggle back real GPS tracking
     function stopRealGPS() {
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
@@ -1373,7 +1397,6 @@
       updateGPSBadgeStatus("OFF");
     }
 
-    // SIMULATION ENGINE WITH LEAN ANGLE INTERPOLATOR
     function runSimulatedStep() {
       if (!state.isSimulating) return;
 
@@ -1610,7 +1633,6 @@
             </div>
           </div>
 
-          <!-- Dynamic Peak leans storage -->
           <div class="grid grid-cols-2 gap-2 text-center bg-slate-950/40 py-1.5 rounded-lg border border-slate-800/40">
             <div>
               <span class="text-[8px] text-slate-500 font-bold uppercase block">Max Left Lean</span>
@@ -1629,7 +1651,6 @@
               </span>
               <div class="flex flex-wrap gap-1.5">
                 ${ride.milestones.map(m => {
-                  // ICSRS Recovery logic applied here to historical cards
                   const speedVal = getMilestoneSpeed(m, ride.path);
                   const displaySpeed = (speedVal !== null && !isNaN(speedVal)) ? Math.round(speedVal) : '--';
                   return `
@@ -1712,7 +1733,6 @@
                 iconAnchor: [12, 12]
               });
               
-              // ICSRS Recovery logic applied to Map popups
               const speedVal = getMilestoneSpeed(m, selectedPath);
               const displaySpeed = (speedVal !== null && !isNaN(speedVal)) ? Math.round(speedVal) : '--';
               const unitText = state.unit === 'mph' ? 'mph' : 'km/h';
@@ -1800,11 +1820,8 @@
     }
 
     function checkIosPwaPrompt() {
-      // Check if user is on iOS and not already running in standalone mode
       const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
       const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-      
-      // Also check if they previously dismissed it to avoid annoying them
       const isDismissed = sessionStorage.getItem('sprocketsync_pwa_dismissed');
 
       if (isIos && !isStandalone && !isDismissed) {
@@ -1814,11 +1831,10 @@
             prompt.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-32');
             prompt.classList.add('opacity-100', 'pointer-events-auto', 'translate-y-0');
           }
-        }, 2000); // Smooth prompt appearance after page content renders
+        }, 2000);
       }
     }
 
-    // Dismiss custom iOS standalone banner
     function dismissPwaPrompt() {
       const prompt = document.getElementById('ios-pwa-prompt');
       if (prompt) {
@@ -1846,7 +1862,6 @@
       showToast("Simulation engine activated successfully!");
     }
 
-    // Manual immediate GPS unlock check
     document.getElementById('btn-manual-gps-check').onclick = () => {
       addLog("User-triggered testing call fired manually...", "text-yellow-500");
       if (!navigator.geolocation) {
@@ -1887,7 +1902,6 @@
       }
     }
 
-    // Page Load Setup Initialization
     window.onload = function() {
       initMap();
       updateSprocketCalibration();
@@ -1895,8 +1909,6 @@
 
       checkPreviousRideRecovery();
       runContextDiagnostic();
-      
-      // Verify iOS browser context to promote standalone mode
       checkIosPwaPrompt();
 
       const btnIMU = document.getElementById('btn-request-imu');
