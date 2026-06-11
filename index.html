@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <!-- Added viewport-fit=cover to allow the app to fill screen under iOS notches and status bars -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>SprocketSync GPS - Moto Dashboard V2</title>
+  <title>ApexMoto GPS - Telemetry Dashboard</title>
   
   <!-- ========================================== -->
   <!-- NATIVE iOS PWA STANDALONE CONFIGURATION -->
@@ -13,10 +13,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <!-- Sets the iOS status bar styling to blend beautifully with our dark layout -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="SprocketSync">
+  <meta name="apple-mobile-web-app-title" content="ApexMoto">
   
   <!-- Inline manifest via data URL to enforce fullscreen standalone mode across modern platforms -->
-  <link rel="manifest" href='data:application/manifest+json,{"name":"SprocketSync","short_name":"SprocketSync","start_url":".","display":"standalone","background_color":"#05070f","theme_color":"#0f172a"}' />
+  <link rel="manifest" href='data:application/manifest+json,{"name":"ApexMoto Telemetry","short_name":"ApexMoto","start_url":".","display":"standalone","background_color":"#05070f","theme_color":"#0f172a"}' />
   <!-- ========================================== -->
 
   <!-- Tailwind CSS -->
@@ -89,8 +89,8 @@
         <i class="fa-solid fa-motorcycle text-slate-950"></i>
       </div>
       <div>
-        <h1 class="text-sm font-black tracking-wider text-slate-100">SPROCKETSYNC <span class="text-yellow-500">V2</span></h1>
-        <p class="text-[10px] text-slate-400 font-semibold tracking-widest">TELEMETRY & GYROSCOPE</p>
+        <h1 class="text-sm font-black tracking-wider text-slate-100">APEXMOTO <span class="text-yellow-500">PRO</span></h1>
+        <p class="text-[10px] text-slate-400 font-semibold tracking-widest">TELEMETRY & CORNERING ANALYTICS</p>
       </div>
     </div>
     <div class="flex items-center gap-2">
@@ -138,7 +138,7 @@
         </div>
         <!-- Terminal event log outputs -->
         <div id="diagnostic-terminal" class="font-mono text-[10px] text-slate-300 space-y-1 max-h-24 overflow-y-auto p-2 bg-[#04060b] rounded border border-slate-900">
-          <div class="text-slate-500">[SYSTEM] SprocketSync V2 active...</div>
+          <div class="text-slate-500">[SYSTEM] ApexMoto Pro active...</div>
           <div class="text-slate-500">[SYSTEM] System secure origin: HTTPS detected.</div>
           <div class="text-yellow-500">[IMU] Gyroscope ready. Tap "Activate Gyro" to begin tracking lean angles...</div>
         </div>
@@ -346,7 +346,7 @@
     <section id="tab-calibrator" class="p-4 space-y-4 max-w-xl mx-auto hidden">
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4">
         <h2 class="text-base font-black text-slate-200 mb-1 tracking-wide uppercase flex items-center gap-2">
-          <i class="fa-solid fa-gears text-yellow-500"></i> Sprocket Calibration
+          <i class="fa-solid fa-gears text-yellow-500"></i> Drive Ratio Calibration
         </h2>
         <p class="text-xs text-slate-400 leading-relaxed">
           Gearing modifications throw off speedometers. Save configuration profiles to translate drive shaft speed accurately.
@@ -501,7 +501,7 @@
       </button>
     </div>
     <p class="text-xs text-slate-300 leading-relaxed mt-1">
-      SprocketSync V2 is ready to run like a native app. To completely hide Safari's top & bottom navigation bars:
+      ApexMoto Pro is ready to run like a native app. To completely hide Safari's top & bottom navigation bars:
     </p>
     <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 space-y-1">
       <p class="flex items-center gap-1.5"><span class="text-cyan-400 font-bold">1.</span> Tap the <strong class="text-yellow-500"><i class="fa-solid fa-share-from-square"></i> Share</strong> button at the bottom of Safari.</p>
@@ -1951,7 +1951,7 @@
         };
       }
 
-      addLog("SprocketSync fully initialized. Ready for user gesture.", "text-emerald-400 font-bold");
+      addLog("ApexMoto fully initialized. Ready for user gesture.", "text-emerald-400 font-bold");
     }
   </script>
 </body>
