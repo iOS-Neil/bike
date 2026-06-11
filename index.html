@@ -484,6 +484,31 @@
     <span id="toast-message">Testing active</span>
   </div>
 
+  <!-- iOS Add to Home Screen Prompt Overlay (Shown only to non-standalone iOS users) -->
+  <div id="ios-pwa-prompt" class="fixed bottom-24 left-4 right-4 bg-slate-950 border-2 border-cyan-500 rounded-2xl p-4 shadow-2xl z-[99999] transition-all duration-500 transform translate-y-32 opacity-0 pointer-events-none flex flex-col gap-2 max-w-xl mx-auto">
+    <div class="flex justify-between items-start">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center text-slate-950">
+          <i class="fa-solid fa-mobile-screen-button"></i>
+        </div>
+        <div>
+          <h4 class="text-xs font-black text-slate-100 uppercase tracking-wide">Go Fullscreen (Hide Safari Bars)</h4>
+          <p class="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Unlock Native PWA Layout</p>
+        </div>
+      </div>
+      <button onclick="dismissPwaPrompt()" class="text-slate-500 hover:text-slate-300 p-1">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+    <p class="text-xs text-slate-300 leading-relaxed mt-1">
+      SprocketSync V2 is ready to run like a native app. To completely hide Safari's top & bottom navigation bars:
+    </p>
+    <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-[11px] text-slate-300 space-y-1">
+      <p class="flex items-center gap-1.5"><span class="text-cyan-400 font-bold">1.</span> Tap the <strong class="text-yellow-500"><i class="fa-solid fa-share-from-square"></i> Share</strong> button at the bottom of Safari.</p>
+      <p class="flex items-center gap-1.5"><span class="text-cyan-400 font-bold">2.</span> Scroll down and tap <strong class="text-yellow-500"><i class="fa-solid fa-square-plus"></i> Add to Home Screen</strong>.</p>
+    </div>
+  </div>
+
   <!-- Bottom Navigation Menu (Adjusted with safe area bottom inset to fit beautifully above virtual home indicators) -->
   <nav class="h-[calc(4rem+env(safe-area-inset-bottom))] bg-slate-950 border-t border-slate-800 flex items-center justify-around shrink-0 z-[10000] px-2 pb-[env(safe-area-inset-bottom)] shadow-inner">
     <button id="nav-btn-cockpit" onclick="switchTab('tab-cockpit', 'nav-btn-cockpit')" class="flex-1 h-full flex flex-col items-center justify-center text-yellow-500 transition-colors">
@@ -1711,6 +1736,34 @@
       }
     }
 
+    function checkIosPwaPrompt() {
+      // Check if user is on iOS and not already running in standalone mode
+      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+      
+      // Also check if they previously dismissed it to avoid annoying them
+      const isDismissed = sessionStorage.getItem('sprocketsync_pwa_dismissed');
+
+      if (isIos && !isStandalone && !isDismissed) {
+        setTimeout(() => {
+          const prompt = document.getElementById('ios-pwa-prompt');
+          if (prompt) {
+            prompt.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-32');
+            prompt.classList.add('opacity-100', 'pointer-events-auto', 'translate-y-0');
+          }
+        }, 2000); // Smooth prompt appearance after page content renders
+      }
+    }
+
+    function dismissPwaPrompt() {
+      const prompt = document.getElementById('ios-pwa-prompt');
+      if (prompt) {
+        prompt.classList.remove('opacity-100', 'pointer-events-auto', 'translate-y-0');
+        prompt.classList.add('opacity-0', 'pointer-events-none', 'translate-y-32');
+      }
+      sessionStorage.setItem('sprocketsync_pwa_dismissed', 'true');
+    }
+
     function activateSimulationViaModal() {
       const modal = document.getElementById('gps-helper-modal');
       if (modal) modal.classList.add('hidden');
@@ -1778,6 +1831,9 @@
 
       checkPreviousRideRecovery();
       runContextDiagnostic();
+      
+      // Verify iOS browser context to promote standalone mode
+      checkIosPwaPrompt();
 
       const btnIMU = document.getElementById('btn-request-imu');
       if (btnIMU) {
